@@ -27,9 +27,9 @@ const resultsSection =
 
 
 
-// --------------------------------------------------
-// Load players
-// --------------------------------------------------
+// ==================================================
+// LOAD PLAYERS
+// ==================================================
 
 async function loadPlayers() {
 
@@ -44,7 +44,9 @@ async function loadPlayers() {
       );
 
 
-    if (!response.ok) {
+    if (
+      !response.ok
+    ) {
 
       throw new Error(
         "Could not load players."
@@ -67,7 +69,9 @@ async function loadPlayers() {
       "Player list could not be loaded.";
 
 
-    console.error(error);
+    console.error(
+      error
+    );
 
   }
 
@@ -75,64 +79,72 @@ async function loadPlayers() {
 
 
 
-// --------------------------------------------------
-// Render player list
-// --------------------------------------------------
+// ==================================================
+// RENDER PLAYER LIST
+// ==================================================
 
 function renderPlayers() {
 
-  playerList.innerHTML = "";
+  playerList.innerHTML =
+    "";
 
 
-  players.forEach(player => {
+  players.forEach(
+    player => {
 
-    const row =
-      document.createElement(
-        "label"
-      );
-
-
-    row.className =
-      "player";
+      const row =
+        document.createElement(
+          "label"
+        );
 
 
-    const stars =
-      "★".repeat(player.skill) +
-      "☆".repeat(
-        5 - player.skill
-      );
+      row.className =
+        "player";
 
 
-    row.innerHTML = `
+      const stars =
+        "★".repeat(
+          player.skill
+        ) +
+        "☆".repeat(
+          5 -
+          player.skill
+        );
 
-      <input
-        type="checkbox"
-        class="playerCheckbox"
-        data-id="${player.id}"
-      >
 
-      <div>
+      row.innerHTML = `
 
-        <div class="player-name">
-          ${player.name}
+        <input
+          type="checkbox"
+          class="playerCheckbox"
+          data-id="${player.id}"
+        >
+
+        <div>
+
+          <div class="player-name">
+            ${player.name}
+          </div>
+
+          <div class="player-info">
+            ${player.category}
+          </div>
+
         </div>
 
-        <div class="player-info">
-          ${player.category}
+        <div class="skill">
+          ${stars}
         </div>
 
-      </div>
-
-      <div class="skill">
-        ${stars}
-      </div>
-
-    `;
+      `;
 
 
-    playerList.appendChild(row);
+      playerList.appendChild(
+        row
+      );
 
-  });
+    }
+  );
 
 
   updatePlayerSummary();
@@ -141,9 +153,9 @@ function renderPlayers() {
 
 
 
-// --------------------------------------------------
-// Attendance
-// --------------------------------------------------
+// ==================================================
+// ATTENDANCE
+// ==================================================
 
 function updatePlayerSummary() {
 
@@ -159,6 +171,7 @@ function updatePlayerSummary() {
 }
 
 
+
 playerList.addEventListener(
   "change",
   updatePlayerSummary
@@ -166,12 +179,14 @@ playerList.addEventListener(
 
 
 
-// --------------------------------------------------
-// Select all
-// --------------------------------------------------
+// ==================================================
+// SELECT ALL
+// ==================================================
 
 document
-  .getElementById("selectAll")
+  .getElementById(
+    "selectAll"
+  )
   .addEventListener(
     "click",
     () => {
@@ -207,17 +222,20 @@ document
 
 
 
-// --------------------------------------------------
-// Courts
-// --------------------------------------------------
+// ==================================================
+// COURTS
+// ==================================================
 
 document
-  .getElementById("courtPlus")
+  .getElementById(
+    "courtPlus"
+  )
   .addEventListener(
     "click",
     () => {
 
       courts++;
+
 
       courtCount.textContent =
         courts;
@@ -226,15 +244,21 @@ document
   );
 
 
+
 document
-  .getElementById("courtMinus")
+  .getElementById(
+    "courtMinus"
+  )
   .addEventListener(
     "click",
     () => {
 
-      if (courts > 1) {
+      if (
+        courts > 1
+      ) {
 
         courts--;
+
 
         courtCount.textContent =
           courts;
@@ -246,18 +270,21 @@ document
 
 
 
-// --------------------------------------------------
-// Helpers
-// --------------------------------------------------
+// ==================================================
+// DISPLAY HELPERS
+// ==================================================
 
 function stars(skill) {
 
   return (
     "★".repeat(skill) +
-    "☆".repeat(5 - skill)
+    "☆".repeat(
+      5 - skill
+    )
   );
 
 }
+
 
 
 function playerRow(player) {
@@ -279,7 +306,9 @@ function playerRow(player) {
       </div>
 
       <span class="result-skill">
-        ${stars(player.skill)}
+        ${stars(
+          player.skill
+        )}
       </span>
 
     </div>
@@ -289,11 +318,14 @@ function playerRow(player) {
 }
 
 
+
 function teamCard(team) {
 
   const playersHtml =
     team.players
-      .map(playerRow)
+      .map(
+        playerRow
+      )
       .join("");
 
 
@@ -323,9 +355,9 @@ function teamCard(team) {
 
 
 
-// --------------------------------------------------
-// Render generated result
-// --------------------------------------------------
+// ==================================================
+// RESULT RENDERING
+// ==================================================
 
 function renderResult(result) {
 
@@ -334,10 +366,40 @@ function renderResult(result) {
 
 
   const formatText =
-    `${plan.teamSize} vs ${plan.teamSize}`;
+    plan.formatLabel ||
+    (
+      plan.teamSize
+        ? `${plan.teamSize} vs ${plan.teamSize}`
+        : "Mixed format"
+    );
 
 
-  let recommendationText = `
+  let specialNote = "";
+
+
+  if (
+    plan.specialKidsCourt
+  ) {
+
+    specialNote = `
+
+      <div
+        style="
+          margin-top: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        "
+      >
+        Kids court reserved as 3v3.
+        Younger players are added where needed.
+      </div>
+
+    `;
+
+  }
+
+
+  const recommendationText = `
 
     <div class="recommendation-title">
 
@@ -351,54 +413,75 @@ function renderResult(result) {
     <div class="recommendation-grid">
 
       <div>
+
         <strong>
           ${plan.completeTeams}
         </strong>
+
         <span>
           teams
         </span>
+
       </div>
 
+
       <div>
+
         <strong>
           ${plan.playableCourts}
         </strong>
+
         <span>
           courts used
         </span>
+
       </div>
 
+
       <div>
+
         <strong>
           ${plan.waitingTeams}
         </strong>
+
         <span>
           waiting teams
         </span>
+
       </div>
 
+
       <div>
+
         <strong>
           ${plan.individualRotation}
         </strong>
+
         <span>
           rotating players
         </span>
+
       </div>
 
     </div>
 
+    ${specialNote}
+
   `;
 
 
-  document.getElementById(
-    "recommendation"
-  ).innerHTML =
-    recommendationText;
+  document
+    .getElementById(
+      "recommendation"
+    )
+    .innerHTML =
+      recommendationText;
 
 
 
+  // ==================================================
   // COURTS
+  // ==================================================
 
   const courtResults =
     document.getElementById(
@@ -406,7 +489,8 @@ function renderResult(result) {
     );
 
 
-  courtResults.innerHTML = "";
+  courtResults.innerHTML =
+    "";
 
 
   result.courtGames.forEach(
@@ -422,21 +506,36 @@ function renderResult(result) {
         "card court-card";
 
 
+      const format =
+        `${game.teamSize}v${game.teamSize}`;
+
+
+      const kidsLabel =
+        game.specialKidsCourt
+          ? " · Kids"
+          : "";
+
+
       court.innerHTML = `
 
         <h2>
           Court ${game.court}
+          · ${format}${kidsLabel}
         </h2>
 
         <div class="matchup">
 
-          ${teamCard(game.team1)}
+          ${teamCard(
+            game.team1
+          )}
 
           <div class="versus">
             VS
           </div>
 
-          ${teamCard(game.team2)}
+          ${teamCard(
+            game.team2
+          )}
 
         </div>
 
@@ -452,7 +551,9 @@ function renderResult(result) {
 
 
 
+  // ==================================================
   // WAITING TEAMS
+  // ==================================================
 
   const waitingSection =
     document.getElementById(
@@ -476,7 +577,9 @@ function renderResult(result) {
 
     waitingTeams.innerHTML =
       result.waitingTeams
-        .map(teamCard)
+        .map(
+          teamCard
+        )
         .join("");
 
   }
@@ -490,7 +593,9 @@ function renderResult(result) {
 
 
 
+  // ==================================================
   // ROTATING PLAYERS
+  // ==================================================
 
   const rotationSection =
     document.getElementById(
@@ -514,7 +619,9 @@ function renderResult(result) {
 
     rotationPlayers.innerHTML =
       result.rotationPlayers
-        .map(playerRow)
+        .map(
+          playerRow
+        )
         .join("");
 
   }
@@ -527,22 +634,28 @@ function renderResult(result) {
   }
 
 
+
   resultsSection.hidden =
     false;
 
 
   resultsSection.scrollIntoView({
-    behavior: "smooth",
-    block: "start"
+
+    behavior:
+      "smooth",
+
+    block:
+      "start"
+
   });
 
 }
 
 
 
-// --------------------------------------------------
-// Generate
-// --------------------------------------------------
+// ==================================================
+// GENERATE
+// ==================================================
 
 document
   .getElementById(
@@ -581,6 +694,7 @@ document
           "Select at least 6 players."
         );
 
+
         return;
 
       }
@@ -604,15 +718,22 @@ document
           );
 
 
-        renderResult(result);
+        renderResult(
+          result
+        );
 
       }
 
       catch (error) {
 
-        alert(error.message);
+        alert(
+          error.message
+        );
 
-        console.error(error);
+
+        console.error(
+          error
+        );
 
       }
 
@@ -621,8 +742,8 @@ document
 
 
 
-// --------------------------------------------------
-// Start application
-// --------------------------------------------------
+// ==================================================
+// START APPLICATION
+// ==================================================
 
 loadPlayers();
