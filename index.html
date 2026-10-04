@@ -1,75 +1,215 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
   <title>3x3 Team Maker</title>
 
-  <link rel="stylesheet" href="styles.css">
+  <link
+    rel="stylesheet"
+    href="styles.css"
+  >
+
 </head>
+
 
 <body>
 
 <header>
+
   <div>
+
     <h1>3x3 Team Maker</h1>
-    <p>Balanced basketball teams</p>
+
+    <p>
+      Balanced basketball teams
+    </p>
+
   </div>
-  <div class="ball">🏀</div>
+
+  <div class="ball">
+    🏀
+  </div>
+
 </header>
+
 
 <main>
 
+
+  <!-- SESSION SETUP -->
+
   <section class="card">
+
     <h2>Session setup</h2>
 
+
     <div class="setting-row">
-      <span>Available courts</span>
+
+      <span>
+        Available courts
+      </span>
+
 
       <div class="counter">
-        <button id="courtMinus">−</button>
-        <span id="courtCount">2</span>
-        <button id="courtPlus">+</button>
+
+        <button id="courtMinus">
+          −
+        </button>
+
+        <span id="courtCount">
+          2
+        </span>
+
+        <button id="courtPlus">
+          +
+        </button>
+
       </div>
+
     </div>
+
 
     <div class="setting-row">
-      <span>Game format</span>
+
+      <span>
+        Game format
+      </span>
+
 
       <select id="gameFormat">
-        <option value="auto">Auto — prefer 3v3</option>
-        <option value="3">3 vs 3</option>
-        <option value="4">4 vs 4</option>
+
+        <option value="auto">
+          Auto — prefer 3v3
+        </option>
+
+        <option value="3">
+          Force 3 vs 3
+        </option>
+
+        <option value="4">
+          Force 4 vs 4
+        </option>
+
       </select>
+
     </div>
+
   </section>
 
+
+
+  <!-- PLAYER SELECTION -->
 
   <section class="card">
 
     <div class="section-header">
+
       <div>
+
         <h2>Players</h2>
-        <p id="playerSummary">Loading players...</p>
+
+        <p id="playerSummary">
+          Loading players...
+        </p>
+
       </div>
 
-      <button id="selectAll" class="secondary">
+
+      <button
+        id="selectAll"
+        class="secondary"
+      >
         Select all
       </button>
+
     </div>
+
 
     <div id="playerList"></div>
 
   </section>
 
 
-  <button id="generateButton" class="generate">
+
+  <!-- GENERATE -->
+
+  <button
+    id="generateButton"
+    class="generate"
+  >
     Create balanced teams
   </button>
 
+
+
+  <!-- RESULTS -->
+
+  <section
+    id="resultsSection"
+    class="results-section"
+    hidden
+  >
+
+    <div
+      id="recommendation"
+      class="card recommendation-card"
+    ></div>
+
+
+    <div id="courtResults"></div>
+
+
+    <div
+      id="waitingSection"
+      class="card"
+      hidden
+    >
+
+      <h2>Next team</h2>
+
+      <div id="waitingTeams"></div>
+
+    </div>
+
+
+    <div
+      id="rotationSection"
+      class="card"
+      hidden
+    >
+
+      <h2>
+        Initial rotation
+      </h2>
+
+      <p class="explanation">
+        These players rotate into the games.
+        They are not excluded from the session.
+      </p>
+
+      <div id="rotationPlayers"></div>
+
+    </div>
+
+  </section>
+
+
 </main>
+
+
+<script src="optimizer.js"></script>
 
 <script src="app.js"></script>
 
+
 </body>
+
 </html>
