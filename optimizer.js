@@ -145,6 +145,68 @@
 
 
 
+  function createCombinations(
+    items,
+    size
+  ) {
+
+    const results = [];
+
+
+    function build(
+      start,
+      current
+    ) {
+
+      if (
+        current.length === size
+      ) {
+
+        results.push(
+          [...current]
+        );
+
+        return;
+
+      }
+
+
+      for (
+        let i = start;
+        i < items.length;
+        i++
+      ) {
+
+        current.push(
+          items[i]
+        );
+
+
+        build(
+          i + 1,
+          current
+        );
+
+
+        current.pop();
+
+      }
+
+    }
+
+
+    build(
+      0,
+      []
+    );
+
+
+    return results;
+
+  }
+
+
+
   // ==================================================
   // GAME FORMAT
   // ==================================================
@@ -205,35 +267,37 @@
       playableCourts;
 
 
-    /*
-      Lower score = better.
-
-      Main philosophy:
-
-      - Prefer 3v3
-      - Avoid loose rotating players
-      - Complete waiting teams are acceptable
-      - Use available courts when possible
-    */
-
     let score = 0;
 
+
+    /*
+      Loose individual players are
+      less desirable than a complete
+      waiting team.
+    */
 
     score +=
       individualRotation * 10;
 
 
+    /*
+      Complete waiting teams are fine.
+    */
+
     score +=
       waitingTeams * 5;
 
+
+    /*
+      Prefer using available courts.
+    */
 
     score +=
       unusedCourts * 20;
 
 
     /*
-      4v4 receives a penalty because
-      3x3 remains the preferred format.
+      3v3 remains the primary format.
     */
 
     if (
@@ -376,7 +440,7 @@
 
 
     /*
-      Tie goes to 3v3.
+      Equal result means 3v3 wins.
     */
 
     return (
@@ -434,8 +498,7 @@
 
     /*
       Avoid putting Kids into individual
-      rotation if another sensible option
-      exists.
+      rotation whenever possible.
     */
 
     rotationPlayers.forEach(
@@ -454,11 +517,6 @@
     );
 
 
-    /*
-      Avoid unnecessarily destroying
-      useful age-group numbers.
-    */
-
     CATEGORY_ORDER.forEach(
       category => {
 
@@ -471,8 +529,8 @@
 
 
         /*
-          Losing the last player of a
-          category is slightly undesirable.
+          Avoid completely removing an
+          age category unnecessarily.
         */
 
         if (
@@ -486,8 +544,8 @@
 
 
         /*
-          Prefer keeping pairs / groups
-          instead of isolating one person.
+          Avoid leaving one isolated
+          player in a category.
         */
 
         if (
@@ -602,10 +660,6 @@
       );
 
 
-    /*
-      General age-distance penalty.
-    */
-
     let score =
       Math.pow(
         distance,
@@ -613,10 +667,6 @@
       ) * 20;
 
 
-
-    // ==================================================
-    // SPECIAL KIDS LOGIC
-    // ==================================================
 
     const player1Kids =
       player1.category ===
@@ -639,11 +689,6 @@
           : player1;
 
 
-      /*
-        Kids + U14 is the desired
-        fallback combination.
-      */
-
       if (
         olderPlayer.category ===
         "U14"
@@ -653,11 +698,6 @@
 
       }
 
-
-      /*
-        Kids + U16 is possible only
-        if necessary.
-      */
 
       else if (
         olderPlayer.category ===
@@ -669,11 +709,6 @@
       }
 
 
-      /*
-        Kids + U18 should almost
-        never occur.
-      */
-
       else if (
         olderPlayer.category ===
         "U18"
@@ -683,11 +718,6 @@
 
       }
 
-
-      /*
-        Kids + adult is considered
-        extremely undesirable.
-      */
 
       else if (
         olderPlayer.category ===
@@ -717,14 +747,6 @@
 
     let score = 0;
 
-
-    /*
-      Compare every player with every
-      other player in the same game pool.
-
-      This means we first decide:
-      "Who belongs on the same court?"
-    */
 
     for (
       let i = 0;
@@ -759,11 +781,6 @@
         )
       ];
 
-
-    /*
-      Prefer simple age pools containing
-      one or two nearby categories.
-    */
 
     if (
       categories.length > 2
@@ -805,7 +822,7 @@
 
 
   // ==================================================
-  // TEAM-SPLIT HELPERS
+  // TEAM SPLITTING
   // ==================================================
 
   function bitCount(number) {
@@ -853,23 +870,6 @@
       );
 
 
-    /*
-      Prefer comparable age composition
-      on both sides of the same court.
-
-      Example:
-
-      2 Kids + 2 U14
-           vs
-      2 Kids + 2 U14
-
-      is preferred over:
-
-      4 Kids
-           vs
-      4 U14
-    */
-
     CATEGORY_ORDER.forEach(
       category => {
 
@@ -880,7 +880,7 @@
           category === "Kids"
         ) {
 
-          weight = 180;
+          weight = 220;
 
         }
 
@@ -889,7 +889,7 @@
           category === "U14"
         ) {
 
-          weight = 80;
+          weight = 90;
 
         }
 
@@ -903,10 +903,6 @@
       }
     );
 
-
-    /*
-      Also compare average age.
-    */
 
     score +=
       Math.abs(
@@ -957,21 +953,12 @@
       ).length;
 
 
-    /*
-      Distribute 5-star players.
-    */
-
     score +=
       Math.abs(
         elite1 -
         elite2
       ) * 120;
 
-
-    /*
-      Two 5-star players in one team
-      is undesirable whenever avoidable.
-    */
 
     if (
       elite1 > 1
@@ -997,11 +984,6 @@
     }
 
 
-    /*
-      Also distribute 4- and 5-star
-      players reasonably.
-    */
-
     score +=
       Math.abs(
         strong1 -
@@ -1014,10 +996,6 @@
   }
 
 
-
-  // ==================================================
-  // SPLIT ONE COURT POOL INTO TWO TEAMS
-  // ==================================================
 
   function splitGamePool(
     pool,
@@ -1049,14 +1027,6 @@
       Infinity;
 
 
-    /*
-      Maximum pool size is currently 8,
-      so checking all combinations is tiny.
-
-      We force player 0 into Team 1 to
-      avoid testing mirrored duplicates.
-    */
-
     const totalMasks =
       1 << playerCount;
 
@@ -1066,6 +1036,12 @@
       mask < totalMasks;
       mask++
     ) {
+
+      /*
+        Player zero always stays in
+        Team 1 to avoid mirrored
+        duplicate combinations.
+      */
 
       if (
         (mask & 1) === 0
@@ -1130,21 +1106,11 @@
         );
 
 
-      /*
-        Skill difference is very important
-        inside the same game.
-      */
-
       let score =
         Math.abs(
           skill1 - skill2
         ) * 160;
 
-
-      /*
-        Make the age composition of the two
-        teams as similar as possible.
-      */
 
       score +=
         teamCompositionScore(
@@ -1152,10 +1118,6 @@
           team2
         );
 
-
-      /*
-        Avoid stacking top-skilled players.
-      */
 
       score +=
         eliteDistributionScore(
@@ -1194,7 +1156,187 @@
 
 
   // ==================================================
-  // AGE-ORDERED PLAYER LIST
+  // SPECIAL KIDS 3V3 COURT
+  // ==================================================
+
+  function findSpecialKidsCourt(
+    players
+  ) {
+
+    const kids =
+      players.filter(
+        player =>
+          player.category ===
+          "Kids"
+      );
+
+
+    /*
+      Special Kids court is used when
+      there are 2–5 Kids.
+
+      Six Kids already make a complete
+      standalone 3v3 game.
+    */
+
+    if (
+      kids.length < 2 ||
+      kids.length >= 6
+    ) {
+
+      return null;
+
+    }
+
+
+    const fillersNeeded =
+      6 - kids.length;
+
+
+    /*
+      U14 is the preferred source.
+
+      U16 is allowed only as a fallback.
+    */
+
+    const eligibleFillers =
+      players.filter(
+        player =>
+          player.category === "U14" ||
+          player.category === "U16"
+      );
+
+
+    if (
+      eligibleFillers.length <
+      fillersNeeded
+    ) {
+
+      return null;
+
+    }
+
+
+    const combinations =
+      createCombinations(
+        eligibleFillers,
+        fillersNeeded
+      );
+
+
+    let bestResult = null;
+
+    let bestScore =
+      Infinity;
+
+
+    combinations.forEach(
+      fillers => {
+
+        let score = 0;
+
+
+        /*
+          Strongly prefer U14 players
+          over U16 players.
+        */
+
+        fillers.forEach(
+          player => {
+
+            if (
+              player.category ===
+              "U16"
+            ) {
+
+              score += 1200;
+
+            }
+
+
+            /*
+              When playing down,
+              lower-skilled players
+              are preferred.
+            */
+
+            score +=
+              player.skill * 20;
+
+
+            if (
+              player.skill === 5
+            ) {
+
+              score += 250;
+
+            }
+
+
+            else if (
+              player.skill === 4
+            ) {
+
+              score += 80;
+
+            }
+
+          }
+        );
+
+
+        const pool = [
+          ...kids,
+          ...fillers
+        ];
+
+
+        const split =
+          splitGamePool(
+            pool,
+            3
+          );
+
+
+        score +=
+          split.score;
+
+
+        if (
+          score < bestScore
+        ) {
+
+          bestScore =
+            score;
+
+
+          bestResult = {
+
+            players:
+              pool,
+
+            fillers,
+
+            split,
+
+            score
+
+          };
+
+        }
+
+      }
+    );
+
+
+    return bestResult;
+
+  }
+
+
+
+  // ==================================================
+  // AGE ORDERING
   // ==================================================
 
   function createAgeOrderedPlayers(
@@ -1212,14 +1354,6 @@
           if (
             softRandomness
           ) {
-
-            /*
-              Small random variation allows
-              neighboring categories to move
-              naturally across pool boundaries
-              without throwing distant ages
-              together.
-            */
 
             noise =
               (
@@ -1267,10 +1401,6 @@
     const descriptors = [];
 
 
-    /*
-      Every active court needs two teams.
-    */
-
     for (
       let court = 0;
       court < plan.playableCourts;
@@ -1289,10 +1419,6 @@
 
     }
 
-
-    /*
-      Each waiting team is one complete team.
-    */
 
     for (
       let waiting = 0;
@@ -1320,7 +1446,7 @@
 
 
   // ==================================================
-  // WAITING TEAM SCORE
+  // WAITING TEAM QUALITY
   // ==================================================
 
   function waitingTeamScore(
@@ -1332,14 +1458,6 @@
         players
       );
 
-
-    /*
-      Slightly discourage having Kids
-      as a complete waiting team when
-      alternatives exist.
-
-      Not forbidden, merely discouraged.
-    */
 
     const kids =
       players.filter(
@@ -1371,13 +1489,6 @@
     let orderedPlayers;
 
 
-    /*
-      Most attempts use age ordering.
-      Occasionally use broader randomisation
-      so the optimiser does not get trapped
-      in one fixed structure.
-    */
-
     if (
       Math.random() < 0.10
     ) {
@@ -1399,12 +1510,6 @@
 
     }
 
-
-    /*
-      Shuffle the position of waiting-team
-      blocks so the youngest or oldest group
-      is not automatically always waiting.
-    */
 
     const descriptors =
       shuffle(
@@ -1455,21 +1560,11 @@
         "game"
       ) {
 
-        /*
-          First evaluate whether these
-          players belong on the same court.
-        */
-
         const ageScore =
           gamePoolAgeScore(
             group
           );
 
-
-        /*
-          Then calculate the best possible
-          two-team split inside that court.
-        */
 
         const split =
           splitGamePool(
@@ -1496,7 +1591,10 @@
           averageAge:
             averageAgeRank(
               group
-            )
+            ),
+
+          teamSize:
+            plan.teamSize
 
         });
 
@@ -1519,7 +1617,10 @@
           averageAge:
             averageAgeRank(
               group
-            )
+            ),
+
+          teamSize:
+            plan.teamSize
 
         });
 
@@ -1556,11 +1657,6 @@
     let bestScore =
       Infinity;
 
-
-    /*
-      Still lightweight for the small
-      player numbers in these sessions.
-    */
 
     const attempts =
       5000;
@@ -1616,11 +1712,6 @@
     }
 
 
-    /*
-      For presentation, show younger
-      courts first and older courts later.
-    */
-
     best.gameGroups.sort(
       (a, b) =>
         a.averageAge -
@@ -1664,21 +1755,203 @@
       name,
 
       players:
-
         [...players],
 
       totalSkill,
 
       averageSkill:
-
         totalSkill /
         players.length,
 
       averageAgeRank:
-
         averageAgeRank(
           players
+        ),
+
+      teamSize:
+        players.length
+
+    };
+
+  }
+
+
+
+  function teamLetter(index) {
+
+    return String.fromCharCode(
+      65 + index
+    );
+
+  }
+
+
+
+  // ==================================================
+  // BUILD STANDARD PART OF SESSION
+  // ==================================================
+
+  function buildStandardSession(
+    players,
+    plan,
+    teamIndexStart,
+    courtOffset
+  ) {
+
+    const rotationPlayers =
+      selectRotationPlayers(
+        players,
+        plan.individualRotation
+      );
+
+
+    const rotationIds =
+      new Set(
+        rotationPlayers.map(
+          player =>
+            player.id
         )
+      );
+
+
+    const teamPlayers =
+      players.filter(
+        player =>
+          !rotationIds.has(
+            player.id
+          )
+      );
+
+
+    const structure =
+      createSessionStructure(
+        teamPlayers,
+        plan
+      );
+
+
+    const courtGames = [];
+
+    const teams = [];
+
+    const waitingTeams = [];
+
+
+    let teamIndex =
+      teamIndexStart;
+
+
+    structure.gameGroups.forEach(
+      (
+        group,
+        courtIndex
+      ) => {
+
+        const team1 =
+          createTeamObject(
+
+            group.split.team1,
+
+            `Team ${teamLetter(
+              teamIndex
+            )}`,
+
+            `T${teamIndex + 1}`
+
+          );
+
+
+        teamIndex++;
+
+
+        const team2 =
+          createTeamObject(
+
+            group.split.team2,
+
+            `Team ${teamLetter(
+              teamIndex
+            )}`,
+
+            `T${teamIndex + 1}`
+
+          );
+
+
+        teamIndex++;
+
+
+        courtGames.push({
+
+          court:
+            courtOffset +
+            courtIndex +
+            1,
+
+          teamSize:
+            plan.teamSize,
+
+          team1,
+
+          team2
+
+        });
+
+
+        teams.push(
+          team1,
+          team2
+        );
+
+      }
+    );
+
+
+    structure.waitingGroups.forEach(
+      group => {
+
+        const team =
+          createTeamObject(
+
+            group.players,
+
+            `Team ${teamLetter(
+              teamIndex
+            )}`,
+
+            `T${teamIndex + 1}`
+
+          );
+
+
+        teamIndex++;
+
+
+        waitingTeams.push(
+          team
+        );
+
+
+        teams.push(
+          team
+        );
+
+      }
+    );
+
+
+    return {
+
+      teams,
+
+      courtGames,
+
+      waitingTeams,
+
+      rotationPlayers,
+
+      nextTeamIndex:
+        teamIndex
 
     };
 
@@ -1687,16 +1960,341 @@
 
 
   // ==================================================
-  // TEAM LABEL
+  // STANDARD SESSION
   // ==================================================
 
-  function teamLetter(
-    index
+  function generateStandardSession(
+    selectedPlayers,
+    courts,
+    formatPreference
   ) {
 
-    return String.fromCharCode(
-      65 + index
-    );
+    const plan =
+      choosePlan(
+        selectedPlayers.length,
+        courts,
+        formatPreference
+      );
+
+
+    const result =
+      buildStandardSession(
+        selectedPlayers,
+        plan,
+        0,
+        0
+      );
+
+
+    return {
+
+      plan: {
+
+        ...plan,
+
+        formatLabel:
+          `${plan.teamSize} vs ${plan.teamSize}`,
+
+        mixedFormats:
+          false,
+
+        specialKidsCourt:
+          false
+
+      },
+
+      teams:
+        result.teams,
+
+      courtGames:
+        result.courtGames,
+
+      waitingTeams:
+        result.waitingTeams,
+
+      rotationPlayers:
+        result.rotationPlayers
+
+    };
+
+  }
+
+
+
+  // ==================================================
+  // SPECIAL KIDS + REMAINING SESSION
+  // ==================================================
+
+  function generateSpecialKidsSession(
+    selectedPlayers,
+    courts
+  ) {
+
+    const kidsCourt =
+      findSpecialKidsCourt(
+        selectedPlayers
+      );
+
+
+    if (
+      !kidsCourt
+    ) {
+
+      return null;
+
+    }
+
+
+    const specialIds =
+      new Set(
+        kidsCourt.players.map(
+          player =>
+            player.id
+        )
+      );
+
+
+    const remainingPlayers =
+      selectedPlayers.filter(
+        player =>
+          !specialIds.has(
+            player.id
+          )
+      );
+
+
+    // ------------------------------------------------
+    // KIDS COURT TEAMS
+    // ------------------------------------------------
+
+    const teamA =
+      createTeamObject(
+
+        kidsCourt.split.team1,
+
+        "Team A",
+
+        "T1"
+
+      );
+
+
+    const teamB =
+      createTeamObject(
+
+        kidsCourt.split.team2,
+
+        "Team B",
+
+        "T2"
+
+      );
+
+
+    const courtGames = [
+
+      {
+
+        court: 1,
+
+        teamSize: 3,
+
+        specialKidsCourt: true,
+
+        team1: teamA,
+
+        team2: teamB
+
+      }
+
+    ];
+
+
+    const allTeams = [
+      teamA,
+      teamB
+    ];
+
+
+    let waitingTeams = [];
+
+    let rotationPlayers = [];
+
+
+    let remainingPlan = null;
+
+
+    // ------------------------------------------------
+    // REMAINING COURTS
+    // ------------------------------------------------
+
+    const remainingCourts =
+      Math.max(
+        0,
+        courts - 1
+      );
+
+
+    /*
+      If another complete game can be
+      created and another court exists,
+      optimize the remainder independently.
+    */
+
+    if (
+      remainingCourts > 0 &&
+      remainingPlayers.length >= 6
+    ) {
+
+      remainingPlan =
+        choosePlan(
+          remainingPlayers.length,
+          remainingCourts,
+          "auto"
+        );
+
+
+      const remainingResult =
+        buildStandardSession(
+          remainingPlayers,
+          remainingPlan,
+          2,
+          1
+        );
+
+
+      courtGames.push(
+        ...remainingResult.courtGames
+      );
+
+
+      allTeams.push(
+        ...remainingResult.teams
+      );
+
+
+      waitingTeams =
+        remainingResult.waitingTeams;
+
+
+      rotationPlayers =
+        remainingResult.rotationPlayers;
+
+    }
+
+
+    else {
+
+      /*
+        Not enough players / courts for
+        another complete game.
+
+        Those players start in rotation.
+      */
+
+      rotationPlayers =
+        [...remainingPlayers];
+
+    }
+
+
+    // ------------------------------------------------
+    // SESSION SUMMARY
+    // ------------------------------------------------
+
+    const remainingTeamCount =
+      remainingPlan
+        ? remainingPlan.completeTeams
+        : 0;
+
+
+    const completeTeams =
+      2 +
+      remainingTeamCount;
+
+
+    const playableCourts =
+      1 +
+      (
+        remainingPlan
+          ? remainingPlan.playableCourts
+          : 0
+      );
+
+
+    const waitingTeamCount =
+      remainingPlan
+        ? remainingPlan.waitingTeams
+        : 0;
+
+
+    let formatLabel =
+      "3 vs 3";
+
+
+    let mixedFormats =
+      false;
+
+
+    if (
+      remainingPlan &&
+      remainingPlan.teamSize === 4
+    ) {
+
+      formatLabel =
+        "3 vs 3 + 4 vs 4";
+
+
+      mixedFormats =
+        true;
+
+    }
+
+
+    return {
+
+      plan: {
+
+        valid: true,
+
+        formatLabel,
+
+        mixedFormats,
+
+        specialKidsCourt:
+          true,
+
+        teamSize:
+          mixedFormats
+            ? null
+            : 3,
+
+        completeTeams,
+
+        playableCourts,
+
+        waitingTeams:
+          waitingTeamCount,
+
+        individualRotation:
+          rotationPlayers.length,
+
+        unusedCourts:
+          courts -
+          playableCourts
+
+      },
+
+      teams:
+        allTeams,
+
+      courtGames,
+
+      waitingTeams,
+
+      rotationPlayers
+
+    };
 
   }
 
@@ -1712,193 +2310,61 @@
     formatPreference
   ) {
 
-    // ------------------------------------------------
-    // CHOOSE 3V3 / 4V4
-    // ------------------------------------------------
+    /*
+      The dedicated Kids 3v3 court is
+      an AUTO-mode feature.
 
-    const plan =
-      choosePlan(
-        selectedPlayers.length,
-        courts,
-        formatPreference
-      );
+      Manual Force 3v3 / Force 4v4
+      remains literal.
+    */
 
+    if (
+      formatPreference === "auto"
+    ) {
 
-    // ------------------------------------------------
-    // SELECT INDIVIDUAL ROTATION PLAYERS
-    // ------------------------------------------------
-
-    const rotationPlayers =
-      selectRotationPlayers(
-        selectedPlayers,
-        plan.individualRotation
-      );
-
-
-    const rotationIds =
-      new Set(
-        rotationPlayers.map(
+      const kids =
+        selectedPlayers.filter(
           player =>
-            player.id
-        )
-      );
-
-
-    // ------------------------------------------------
-    // PLAYERS USED FOR COMPLETE TEAMS
-    // ------------------------------------------------
-
-    const teamPlayers =
-      selectedPlayers.filter(
-        player =>
-          !rotationIds.has(
-            player.id
-          )
-      );
-
-
-    // ------------------------------------------------
-    // BUILD AGE-COMPATIBLE GAME POOLS
-    // ------------------------------------------------
-
-    const structure =
-      createSessionStructure(
-        teamPlayers,
-        plan
-      );
-
-
-    // ------------------------------------------------
-    // CREATE COURT TEAMS
-    // ------------------------------------------------
-
-    const courtGames = [];
-
-    const allTeams = [];
-
-
-    let teamIndex = 0;
-
-
-    structure.gameGroups.forEach(
-      (
-        group,
-        courtIndex
-      ) => {
-
-        const team1Name =
-          `Team ${teamLetter(
-            teamIndex
-          )}`;
-
-
-        const team1 =
-          createTeamObject(
-            group.split.team1,
-            team1Name,
-            `T${teamIndex + 1}`
-          );
-
-
-        teamIndex++;
-
-
-        const team2Name =
-          `Team ${teamLetter(
-            teamIndex
-          )}`;
-
-
-        const team2 =
-          createTeamObject(
-            group.split.team2,
-            team2Name,
-            `T${teamIndex + 1}`
-          );
-
-
-        teamIndex++;
-
-
-        courtGames.push({
-
-          court:
-            courtIndex + 1,
-
-          team1,
-
-          team2
-
-        });
-
-
-        allTeams.push(
-          team1,
-          team2
+            player.category ===
+            "Kids"
         );
+
+
+      if (
+        kids.length >= 2 &&
+        kids.length < 6
+      ) {
+
+        const specialResult =
+          generateSpecialKidsSession(
+            selectedPlayers,
+            courts
+          );
+
+
+        if (
+          specialResult
+        ) {
+
+          return specialResult;
+
+        }
 
       }
+
+    }
+
+
+    /*
+      If the special rule cannot be used,
+      fall back to the normal optimizer.
+    */
+
+    return generateStandardSession(
+      selectedPlayers,
+      courts,
+      formatPreference
     );
-
-
-    // ------------------------------------------------
-    // CREATE WAITING TEAMS
-    // ------------------------------------------------
-
-    const waitingTeams = [];
-
-
-    structure.waitingGroups.forEach(
-      group => {
-
-        const teamName =
-          `Team ${teamLetter(
-            teamIndex
-          )}`;
-
-
-        const team =
-          createTeamObject(
-            group.players,
-            teamName,
-            `T${teamIndex + 1}`
-          );
-
-
-        teamIndex++;
-
-
-        waitingTeams.push(
-          team
-        );
-
-
-        allTeams.push(
-          team
-        );
-
-      }
-    );
-
-
-    // ------------------------------------------------
-    // RESULT
-    // ------------------------------------------------
-
-    return {
-
-      plan,
-
-      teams:
-        allTeams,
-
-      courtGames,
-
-      waitingTeams,
-
-      rotationPlayers
-
-    };
 
   }
 
