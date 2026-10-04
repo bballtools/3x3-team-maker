@@ -1,0 +1,159 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f5f7;
+  color: #1f2937;
+}
+
+header {
+  background: #111827;
+  color: white;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+header p {
+  margin: 4px 0 0;
+  color: #cbd5e1;
+}
+
+.ball {
+  font-size: 32px;
+}
+
+main {
+  max-width: 700px;
+  margin: auto;
+  padding: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 18px 0;
+  gap: 16px;
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.counter button {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #e5e7eb;
+  font-size: 22px;
+}
+
+select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: white;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-header p {
+  margin: 4px 0 14px;
+  color: #6b7280;
+}
+
+.secondary {
+  border: none;
+  background: #e5e7eb;
+  padding: 9px 12px;
+  border-radius: 8px;
+}
+
+.player {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+
+  border-top: 1px solid #e5e7eb;
+  padding: 13px 2px;
+}
+
+.player input {
+  width: 21px;
+  height: 21px;
+}
+
+.player-name {
+  font-weight: 600;
+}
+
+.player-info {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.skill {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.generate {
+  width: 100%;
+  border: none;
+  background: #f97316;
+  color: white;
+  padding: 16px;
+  border-radius: 12px;
+
+  font-size: 17px;
+  font-weight: bold;
+
+  cursor: pointer;
+}
+
+.generate:active {
+  transform: scale(0.99);
+}
+
+@media (max-width: 500px) {
+
+  .setting-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  select {
+    width: 100%;
+  }
+
+}
