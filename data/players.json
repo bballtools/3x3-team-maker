@@ -1,38 +1,31 @@
 [
-  {
-    "id": "P001",
-    "name": "Amir",
-    "category": "U16",
-    "skill": 4
-  },
-  {
-    "id": "P002",
-    "name": "Lucas",
-    "category": "18+",
-    "skill": 5
-  },
-  {
-    "id": "P003",
-    "name": "Noah",
-    "category": "U14",
-    "skill": 3
-  },
-  {
-    "id": "P004",
-    "name": "Finn",
-    "category": "Kids",
-    "skill": 2
-  },
-  {
-    "id": "P005",
-    "name": "Jamie",
-    "category": "U18",
-    "skill": 4
-  },
-  {
-    "id": "P006",
-    "name": "Sam",
-    "category": "U16",
-    "skill": 3
-  }
+  { "id": "P001", "name": "Amir",   "category": "U16",  "skill": 4 },
+  { "id": "P002", "name": "Lucas",  "category": "18+",  "skill": 5 },
+  { "id": "P003", "name": "Noah",   "category": "U14",  "skill": 3 },
+  { "id": "P004", "name": "Finn",   "category": "Kids", "skill": 2 },
+  { "id": "P005", "name": "Jamie",  "category": "U18",  "skill": 4 },
+  { "id": "P006", "name": "Sam",    "category": "U16",  "skill": 3 },
+
+  { "id": "P007", "name": "Milan",  "category": "U14",  "skill": 4 },
+  { "id": "P008", "name": "Jayden", "category": "U14",  "skill": 2 },
+  { "id": "P009", "name": "Leo",    "category": "U14",  "skill": 3 },
+  { "id": "P010", "name": "Adam",   "category": "U14",  "skill": 5 },
+  { "id": "P011", "name": "Ben",    "category": "U14",  "skill": 2 },
+
+  { "id": "P012", "name": "Daan",   "category": "U16",  "skill": 5 },
+  { "id": "P013", "name": "Mika",   "category": "U16",  "skill": 2 },
+  { "id": "P014", "name": "Ryan",   "category": "U16",  "skill": 3 },
+  { "id": "P015", "name": "Tyler",  "category": "U16",  "skill": 4 },
+
+  { "id": "P016", "name": "Owen",   "category": "U18",  "skill": 5 },
+  { "id": "P017", "name": "Nico",   "category": "U18",  "skill": 3 },
+  { "id": "P018", "name": "Jesse",  "category": "U18",  "skill": 2 },
+
+  { "id": "P019", "name": "Max",    "category": "18+",  "skill": 4 },
+  { "id": "P020", "name": "Chris",  "category": "18+",  "skill": 3 },
+  { "id": "P021", "name": "David",  "category": "18+",  "skill": 2 },
+
+  { "id": "P022", "name": "Eli",    "category": "Kids", "skill": 3 },
+  { "id": "P023", "name": "Kai",    "category": "Kids", "skill": 2 },
+  { "id": "P024", "name": "Liam",   "category": "Kids", "skill": 1 }
 ]
