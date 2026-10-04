@@ -1,0 +1,38 @@
+[
+  {
+    "id": "P001",
+    "name": "Amir",
+    "category": "U16",
+    "skill": 4
+  },
+  {
+    "id": "P002",
+    "name": "Lucas",
+    "category": "18+",
+    "skill": 5
+  },
+  {
+    "id": "P003",
+    "name": "Noah",
+    "category": "U14",
+    "skill": 3
+  },
+  {
+    "id": "P004",
+    "name": "Finn",
+    "category": "Kids",
+    "skill": 2
+  },
+  {
+    "id": "P005",
+    "name": "Jamie",
+    "category": "U18",
+    "skill": 4
+  },
+  {
+    "id": "P006",
+    "name": "Sam",
+    "category": "U16",
+    "skill": 3
+  }
+]
