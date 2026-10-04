@@ -22,7 +22,7 @@
 
 
   // ==================================================
-  // UTILITY
+  // GENERAL UTILITIES
   // ==================================================
 
   function shuffle(array) {
@@ -118,25 +118,36 @@
       playableCourts;
 
 
+    /*
+      Lower score = better.
+
+      Philosophy:
+
+      - individual loose players are undesirable
+      - complete waiting teams are acceptable
+      - unused courts are undesirable
+      - 3v3 receives a strong preference
+    */
+
     let score = 0;
 
 
-    // Loose individual players are undesirable.
+    // Individual rotating players
     score +=
       individualRotation * 10;
 
 
-    // A complete waiting team is acceptable.
+    // Complete waiting teams
     score +=
       waitingTeams * 5;
 
 
-    // Avoid leaving courts unused when possible.
+    // Available courts that cannot be used
     score +=
       unusedCourts * 20;
 
 
-    // Strong preference for 3x3.
+    // Preference for 3x3
     if (teamSize === 4) {
 
       score += 8;
@@ -192,6 +203,10 @@
       );
 
 
+    // ------------------------------------------------
+    // FORCE 3V3
+    // ------------------------------------------------
+
     if (preference === "3") {
 
       if (!plan3.valid) {
@@ -207,6 +222,10 @@
     }
 
 
+    // ------------------------------------------------
+    // FORCE 4V4
+    // ------------------------------------------------
+
     if (preference === "4") {
 
       if (!plan4.valid) {
@@ -221,6 +240,10 @@
 
     }
 
+
+    // ------------------------------------------------
+    // AUTO
+    // ------------------------------------------------
 
     if (
       !plan3.valid &&
@@ -247,6 +270,11 @@
 
     }
 
+
+    /*
+      If scores are equal,
+      3v3 automatically wins.
+    */
 
     return plan3.score <= plan4.score
       ? plan3
@@ -316,8 +344,8 @@
 
       /*
         If an age category originally had enough
-        players for a complete standalone game,
-        avoid breaking that possibility.
+        players for its own complete game,
+        avoid destroying that possibility.
       */
 
       if (
@@ -331,8 +359,8 @@
 
 
       /*
-        Prefer remaining category counts that
-        divide cleanly into teams.
+        Prefer remaining category numbers
+        that divide cleanly into teams.
       */
 
       if (
@@ -347,9 +375,10 @@
     });
 
 
+
     /*
-      Avoid putting Kids into individual rotation
-      unless necessary.
+      Avoid selecting Kids as individual
+      rotating players when alternatives exist.
     */
 
     rotationPlayers.forEach(
@@ -419,7 +448,8 @@
 
         bestScore = score;
 
-        bestRotation = candidate;
+        bestRotation =
+          candidate;
 
       }
 
@@ -486,6 +516,7 @@
     let score = 0;
 
 
+    // General skill balance
     score +=
       variance * 12;
 
@@ -527,6 +558,12 @@
 
 
 
+      /*
+        If there are enough teams to place
+        5-star players separately, strongly
+        discourage putting two together.
+      */
+
       if (
         totalElitePlayers <=
           teams.length &&
@@ -550,6 +587,11 @@
       }
 
 
+
+      /*
+        Also discourage stacking too many
+        4- and 5-star players together.
+      */
 
       if (
         totalStrongPlayers <=
@@ -634,9 +676,9 @@
         );
 
 
-      // ----------------------------------------------
+      // ==============================================
       // KIDS
-      // ----------------------------------------------
+      // ==============================================
 
       if (hasKids) {
 
@@ -649,7 +691,7 @@
 
 
         /*
-          A pure Kids team is ideal.
+          Pure Kids team = ideal.
         */
 
         if (
@@ -665,8 +707,8 @@
           nonKids.forEach(player => {
 
             /*
-              U14 may play down with Kids
-              when necessary.
+              U14 is the preferred fallback
+              when Kids need older players.
             */
 
             if (
@@ -674,18 +716,53 @@
               "U14"
             ) {
 
-              score += 30;
+              score += 25;
 
             }
 
+
             /*
-              U16 or older with Kids is
-              strongly discouraged.
+              U16 may occasionally play down,
+              but should only happen when there
+              is no substantially better option.
             */
 
-            else {
+            else if (
+              player.category ===
+              "U16"
+            ) {
 
-              score += 700;
+              score += 1000;
+
+            }
+
+
+            /*
+              U18 with Kids is strongly avoided.
+            */
+
+            else if (
+              player.category ===
+              "U18"
+            ) {
+
+              score += 3000;
+
+            }
+
+
+            /*
+              Adults with Kids should effectively
+              happen only if no reasonable
+              alternative exists at all.
+            */
+
+            else if (
+              player.category ===
+              "18+"
+            ) {
+
+              score += 5000;
 
             }
 
@@ -696,9 +773,9 @@
       }
 
 
-      // ----------------------------------------------
+      // ==============================================
       // NON-KIDS AGE MIXING
-      // ----------------------------------------------
+      // ==============================================
 
       else {
 
@@ -718,7 +795,9 @@
           Same age category.
         */
 
-        if (spread === 0) {
+        if (
+          spread === 0
+        ) {
 
           score += 0;
 
@@ -726,8 +805,12 @@
 
 
         /*
-          Adjacent categories are acceptable.
-          Example: U14 + U16.
+          Adjacent categories.
+
+          Examples:
+          U14 + U16
+          U16 + U18
+          U18 + 18+
         */
 
         else if (
@@ -741,7 +824,10 @@
 
         /*
           Two-category jump.
-          Example: U14 + U18.
+
+          Examples:
+          U14 + U18
+          U16 + 18+
         */
 
         else if (
@@ -754,7 +840,7 @@
 
 
         /*
-          Very large age gap.
+          Very large age difference.
         */
 
         else {
@@ -764,9 +850,10 @@
         }
 
 
+
         /*
-          Prefer at most two age categories
-          inside one team.
+          Prefer no more than two different
+          age categories in one team.
         */
 
         if (
@@ -774,8 +861,9 @@
         ) {
 
           score +=
-            (categories.length - 2) *
-            35;
+            (
+              categories.length - 2
+            ) * 35;
 
         }
 
@@ -785,9 +873,9 @@
 
 
 
-    // ----------------------------------------------
+    // ==================================================
     // PRESERVE STANDALONE AGE GROUPS
-    // ----------------------------------------------
+    // ==================================================
 
     Object.keys(
       categoryCounts
@@ -834,14 +922,13 @@
           );
 
 
-        if (mixed) {
+        /*
+          If there are enough players from one
+          age group for a complete standalone game,
+          strongly prefer keeping them together.
+        */
 
-          /*
-            If there are enough players from
-            one category for their own game,
-            strongly prefer keeping them
-            together.
-          */
+        if (mixed) {
 
           score +=
             categoryPlayers.length *
@@ -855,15 +942,19 @@
 
 
 
-    /*
-      Kids get an even stronger separation
-      rule when enough Kids exist for a
-      standalone game.
-    */
+    // ==================================================
+    // EXTRA KIDS SEPARATION
+    // ==================================================
 
     const kidsCount =
       categoryCounts["Kids"] || 0;
 
+
+    /*
+      If there are enough Kids for their own
+      complete game, mixed Kids teams become
+      extremely undesirable.
+    */
 
     if (
       kidsCount >=
@@ -890,7 +981,7 @@
         ) {
 
           score +=
-            kids * 250;
+            kids * 1000;
 
         }
 
@@ -906,7 +997,7 @@
 
 
   // ==================================================
-  // BUILD CANDIDATE TEAMS
+  // CREATE CANDIDATE TEAM ORDERS
   // ==================================================
 
   function chunkIntoTeams(
@@ -944,14 +1035,13 @@
     players
   ) {
 
-    const categories =
-      [
-        "Kids",
-        "U14",
-        "U16",
-        "U18",
-        "18+"
-      ];
+    const categories = [
+      "Kids",
+      "U14",
+      "U16",
+      "U18",
+      "18+"
+    ];
 
 
     const ordered = [];
@@ -999,11 +1089,12 @@
 
 
     /*
-      Several thousand combinations are still
-      very small work for a modern phone.
+      The number of players is small enough that
+      thousands of attempts are still extremely
+      lightweight for a modern mobile browser.
     */
 
-    const attempts = 8000;
+    const attempts = 10000;
 
 
     for (
@@ -1018,12 +1109,9 @@
       /*
         Some attempts are completely random.
 
-        Others deliberately place neighboring
-        age groups together first.
-
-        This gives the optimiser much better
-        chances of finding strong age-based
-        solutions.
+        Others start from age-ordering so the
+        optimizer has a good chance of discovering
+        natural age groups.
       */
 
       if (
@@ -1171,6 +1259,131 @@
 
 
   // ==================================================
+  // TEAM AGE PROFILE
+  // ==================================================
+
+  function teamAgeProfile(team) {
+
+    const allRanks =
+      team.players.map(
+        player =>
+          categoryRank(
+            player.category
+          )
+      );
+
+
+    const nonKidsRanks =
+      team.players
+        .filter(
+          player =>
+            player.category !==
+            "Kids"
+        )
+        .map(
+          player =>
+            categoryRank(
+              player.category
+            )
+        );
+
+
+    const average =
+      allRanks.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) /
+      allRanks.length;
+
+
+    const nonKidsAverage =
+      nonKidsRanks.length > 0
+        ? nonKidsRanks.reduce(
+            (sum, value) =>
+              sum + value,
+            0
+          ) /
+          nonKidsRanks.length
+        : 0;
+
+
+    return {
+
+      average,
+
+      nonKidsAverage,
+
+      youngest:
+        Math.min(
+          ...allRanks
+        ),
+
+      oldest:
+        Math.max(
+          ...allRanks
+        ),
+
+      kids:
+        team.players.filter(
+          player =>
+            player.category ===
+            "Kids"
+        ).length,
+
+      u14:
+        team.players.filter(
+          player =>
+            player.category ===
+            "U14"
+        ).length,
+
+      u16:
+        team.players.filter(
+          player =>
+            player.category ===
+            "U16"
+        ).length,
+
+      u18:
+        team.players.filter(
+          player =>
+            player.category ===
+            "U18"
+        ).length,
+
+      adults:
+        team.players.filter(
+          player =>
+            player.category ===
+            "18+"
+        ).length,
+
+      young:
+        team.players.filter(
+          player =>
+            player.category ===
+              "Kids" ||
+            player.category ===
+              "U14"
+        ).length,
+
+      older:
+        team.players.filter(
+          player =>
+            player.category ===
+              "U18" ||
+            player.category ===
+              "18+"
+        ).length
+
+    };
+
+  }
+
+
+
+  // ==================================================
   // MATCHUP QUALITY
   // ==================================================
 
@@ -1182,10 +1395,21 @@
     let score = 0;
 
 
-    /*
-      Similar skill teams should play
-      against each other.
-    */
+    const age1 =
+      teamAgeProfile(
+        team1
+      );
+
+
+    const age2 =
+      teamAgeProfile(
+        team2
+      );
+
+
+    // ==================================================
+    // SKILL DIFFERENCE BETWEEN OPPONENTS
+    // ==================================================
 
     score +=
       Math.abs(
@@ -1195,47 +1419,163 @@
 
 
 
+    // ==================================================
+    // GENERAL AGE DIFFERENCE
+    // ==================================================
+
+    score +=
+      Math.abs(
+        age1.average -
+        age2.average
+      ) * 60;
+
+
+
     /*
-      Similar age teams should play
-      against each other.
+      Especially useful when both teams
+      contain Kids.
+
+      We compare the ages of the players
+      surrounding the Kids.
     */
 
     score +=
       Math.abs(
-        team1.averageAgeRank -
-        team2.averageAgeRank
-      ) * 35;
+        age1.nonKidsAverage -
+        age2.nonKidsAverage
+      ) * 140;
 
-
-
-    const team1Kids =
-      team1.players.some(
-        player =>
-          player.category ===
-          "Kids"
-      );
-
-
-    const team2Kids =
-      team2.players.some(
-        player =>
-          player.category ===
-          "Kids"
-      );
 
 
     /*
-      Never intentionally pair a Kids team
-      against an older team when another
-      reasonable matchup exists.
+      Avoid matching teams whose oldest
+      players differ significantly.
+    */
+
+    score +=
+      Math.abs(
+        age1.oldest -
+        age2.oldest
+      ) * 90;
+
+
+
+    /*
+      Compare actual age composition,
+      rather than relying only on averages.
+    */
+
+    score +=
+      Math.abs(
+        age1.older -
+        age2.older
+      ) * 120;
+
+
+    score +=
+      Math.abs(
+        age1.young -
+        age2.young
+      ) * 80;
+
+
+
+    /*
+      Compare individual category counts.
+      This prevents averages from hiding
+      very different compositions.
+    */
+
+    score +=
+      Math.abs(
+        age1.u14 -
+        age2.u14
+      ) * 30;
+
+
+    score +=
+      Math.abs(
+        age1.u16 -
+        age2.u16
+      ) * 30;
+
+
+    score +=
+      Math.abs(
+        age1.u18 -
+        age2.u18
+      ) * 45;
+
+
+    score +=
+      Math.abs(
+        age1.adults -
+        age2.adults
+      ) * 60;
+
+
+
+    // ==================================================
+    // KIDS MATCHUP RULES
+    // ==================================================
+
+    const team1HasKids =
+      age1.kids > 0;
+
+
+    const team2HasKids =
+      age2.kids > 0;
+
+
+    /*
+      Prefer a team containing Kids to face
+      another team containing Kids.
     */
 
     if (
-      team1Kids !==
-      team2Kids
+      team1HasKids !==
+      team2HasKids
     ) {
 
-      score += 300;
+      score += 600;
+
+    }
+
+
+    /*
+      If both teams contain Kids, compare
+      the players accompanying those Kids.
+
+      Example to avoid:
+
+      Kids + U18 + 18+ + 18+
+
+      against
+
+      Kids + U14 + U14 + U16
+    */
+
+    if (
+      team1HasKids &&
+      team2HasKids
+    ) {
+
+      const companionDifference =
+        Math.abs(
+          age1.nonKidsAverage -
+          age2.nonKidsAverage
+        );
+
+
+      if (
+        companionDifference > 1
+      ) {
+
+        score +=
+          companionDifference *
+          400;
+
+      }
 
     }
 
@@ -1246,82 +1586,124 @@
 
 
 
-  function pairTeams(
-    teams
-  ) {
+  // ==================================================
+  // GLOBAL TEAM PAIRING
+  // ==================================================
 
-    const remaining =
-      shuffle(teams);
+  function pairTeams(teams) {
+
+    /*
+      Test every possible combination of
+      opponent pairings.
+
+      Our sessions contain only a small number
+      of teams, so this is extremely fast.
+
+      Example with 6 teams:
+      the optimizer evaluates all possible
+      ways to create 3 games and keeps the
+      globally best set of matchups.
+    */
 
 
-    const games = [];
-
-    let totalScore = 0;
-
-
-    while (
-      remaining.length >= 2
+    function findBestPairing(
+      remaining
     ) {
 
+      if (
+        remaining.length === 0
+      ) {
+
+        return {
+
+          games: [],
+
+          totalScore: 0
+
+        };
+
+      }
+
+
       const team1 =
-        remaining.shift();
+        remaining[0];
 
 
-      let bestIndex = 0;
-      let bestOpponentScore =
-        Infinity;
+      let bestResult = null;
 
 
-      remaining.forEach(
-        (candidate, index) => {
+      for (
+        let i = 1;
+        i < remaining.length;
+        i++
+      ) {
 
-          const score =
-            matchupScore(
-              team1,
-              candidate
-            );
+        const team2 =
+          remaining[i];
 
 
-          if (
-            score <
-            bestOpponentScore
-          ) {
+        const rest =
+          remaining.filter(
+            (_, index) =>
+              index !== 0 &&
+              index !== i
+          );
 
-            bestOpponentScore =
-              score;
 
-            bestIndex =
-              index;
+        const restResult =
+          findBestPairing(
+            rest
+          );
 
-          }
+
+        const thisScore =
+          matchupScore(
+            team1,
+            team2
+          );
+
+
+        const totalScore =
+          thisScore +
+          restResult.totalScore;
+
+
+        if (
+          bestResult === null ||
+          totalScore <
+            bestResult.totalScore
+        ) {
+
+          bestResult = {
+
+            games: [
+
+              {
+                team1,
+                team2
+              },
+
+              ...restResult.games
+
+            ],
+
+            totalScore
+
+          };
 
         }
-      );
+
+      }
 
 
-      const team2 =
-        remaining.splice(
-          bestIndex,
-          1
-        )[0];
-
-
-      games.push({
-        team1,
-        team2
-      });
-
-
-      totalScore +=
-        bestOpponentScore;
+      return bestResult;
 
     }
 
 
-    return {
-      games,
-      totalScore
-    };
+    return findBestPairing(
+      teams
+    );
 
   }
 
@@ -1344,7 +1726,9 @@
       Math.min(
         maximumActiveTeams,
         teams.length -
-          (teams.length % 2)
+          (
+            teams.length % 2
+          )
       );
 
 
@@ -1359,7 +1743,8 @@
 
     /*
       Try different choices for which teams
-      start and which teams wait.
+      play immediately and which complete
+      teams wait for the next round.
     */
 
     const attempts = 500;
@@ -1372,7 +1757,9 @@
     ) {
 
       const shuffled =
-        shuffle(teams);
+        shuffle(
+          teams
+        );
 
 
       const waitingTeams =
@@ -1404,10 +1791,12 @@
 
 
         bestResult = {
+
           games:
             paired.games,
 
           waitingTeams
+
         };
 
       }
@@ -1464,6 +1853,10 @@
       );
 
 
+    // ------------------------------------------------
+    // SELECT INDIVIDUAL ROTATION PLAYERS
+    // ------------------------------------------------
+
     const rotationPlayers =
       selectRotationPlayers(
         selectedPlayers,
@@ -1481,6 +1874,10 @@
       );
 
 
+    // ------------------------------------------------
+    // PLAYERS USED FOR COMPLETE TEAMS
+    // ------------------------------------------------
+
     const teamPlayers =
       selectedPlayers.filter(
         player =>
@@ -1490,6 +1887,10 @@
       );
 
 
+    // ------------------------------------------------
+    // CREATE TEAMS
+    // ------------------------------------------------
+
     const teams =
       createBalancedTeams(
         teamPlayers,
@@ -1497,6 +1898,10 @@
         plan.teamSize
       );
 
+
+    // ------------------------------------------------
+    // ASSIGN TEAMS TO COURTS
+    // ------------------------------------------------
 
     const schedule =
       createCourtSchedule(
@@ -1530,8 +1935,11 @@
   // ==================================================
 
   window.TeamOptimizer = {
+
     generate,
+
     choosePlan
+
   };
 
 
