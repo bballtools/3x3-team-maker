@@ -4,13 +4,72 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3x3 Team Maker</title>
+
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-  <h1>3x3 Team Maker</h1>
 
-  <p>Basketball team balancing tool.</p>
+<header>
+  <div>
+    <h1>3x3 Team Maker</h1>
+    <p>Balanced basketball teams</p>
+  </div>
+  <div class="ball">🏀</div>
+</header>
 
-  <p>If you can see this page, GitHub Pages is working. 🏀</p>
+<main>
+
+  <section class="card">
+    <h2>Session setup</h2>
+
+    <div class="setting-row">
+      <span>Available courts</span>
+
+      <div class="counter">
+        <button id="courtMinus">−</button>
+        <span id="courtCount">2</span>
+        <button id="courtPlus">+</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <span>Game format</span>
+
+      <select id="gameFormat">
+        <option value="auto">Auto — prefer 3v3</option>
+        <option value="3">3 vs 3</option>
+        <option value="4">4 vs 4</option>
+      </select>
+    </div>
+  </section>
+
+
+  <section class="card">
+
+    <div class="section-header">
+      <div>
+        <h2>Players</h2>
+        <p id="playerSummary">Loading players...</p>
+      </div>
+
+      <button id="selectAll" class="secondary">
+        Select all
+      </button>
+    </div>
+
+    <div id="playerList"></div>
+
+  </section>
+
+
+  <button id="generateButton" class="generate">
+    Create balanced teams
+  </button>
+
+</main>
+
+<script src="app.js"></script>
+
 </body>
 </html>
