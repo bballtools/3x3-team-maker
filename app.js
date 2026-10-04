@@ -1,35 +1,71 @@
 let players = [];
 let courts = 2;
 
-const playerList = document.getElementById("playerList");
-const playerSummary = document.getElementById("playerSummary");
-const courtCount = document.getElementById("courtCount");
+
+const playerList =
+  document.getElementById(
+    "playerList"
+  );
 
 
-// -----------------------------
-// Load players from GitHub
-// -----------------------------
+const playerSummary =
+  document.getElementById(
+    "playerSummary"
+  );
+
+
+const courtCount =
+  document.getElementById(
+    "courtCount"
+  );
+
+
+const resultsSection =
+  document.getElementById(
+    "resultsSection"
+  );
+
+
+
+// --------------------------------------------------
+// Load players
+// --------------------------------------------------
 
 async function loadPlayers() {
 
   try {
 
-    const response = await fetch("./data/players.json", {
-      cache: "no-store"
-    });
+    const response =
+      await fetch(
+        "./data/players.json",
+        {
+          cache: "no-store"
+        }
+      );
+
 
     if (!response.ok) {
-      throw new Error("Could not load players.");
+
+      throw new Error(
+        "Could not load players."
+      );
+
     }
 
-    players = await response.json();
+
+    players =
+      await response.json();
+
 
     renderPlayers();
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     playerSummary.textContent =
       "Player list could not be loaded.";
+
 
     console.error(error);
 
@@ -38,23 +74,34 @@ async function loadPlayers() {
 }
 
 
-// -----------------------------
+
+// --------------------------------------------------
 // Render player list
-// -----------------------------
+// --------------------------------------------------
 
 function renderPlayers() {
 
   playerList.innerHTML = "";
 
+
   players.forEach(player => {
 
-    const row = document.createElement("label");
+    const row =
+      document.createElement(
+        "label"
+      );
 
-    row.className = "player";
+
+    row.className =
+      "player";
+
 
     const stars =
       "★".repeat(player.skill) +
-      "☆".repeat(5 - player.skill);
+      "☆".repeat(
+        5 - player.skill
+      );
+
 
     row.innerHTML = `
 
@@ -82,18 +129,21 @@ function renderPlayers() {
 
     `;
 
+
     playerList.appendChild(row);
 
   });
+
 
   updatePlayerSummary();
 
 }
 
 
-// -----------------------------
-// Present players
-// -----------------------------
+
+// --------------------------------------------------
+// Attendance
+// --------------------------------------------------
 
 function updatePlayerSummary() {
 
@@ -101,6 +151,7 @@ function updatePlayerSummary() {
     document.querySelectorAll(
       ".playerCheckbox:checked"
     ).length;
+
 
   playerSummary.textContent =
     `${selected} of ${players.length} players present`;
@@ -114,89 +165,464 @@ playerList.addEventListener(
 );
 
 
-// -----------------------------
+
+// --------------------------------------------------
 // Select all
-// -----------------------------
+// --------------------------------------------------
 
-document.getElementById("selectAll")
-  .addEventListener("click", () => {
+document
+  .getElementById("selectAll")
+  .addEventListener(
+    "click",
+    () => {
 
-    const checkboxes =
-      document.querySelectorAll(
-        ".playerCheckbox"
+      const checkboxes =
+        document.querySelectorAll(
+          ".playerCheckbox"
+        );
+
+
+      const allSelected =
+        [...checkboxes]
+          .every(
+            checkbox =>
+              checkbox.checked
+          );
+
+
+      checkboxes.forEach(
+        checkbox => {
+
+          checkbox.checked =
+            !allSelected;
+
+        }
       );
 
-    const allSelected =
-      [...checkboxes]
-        .every(cb => cb.checked);
 
-    checkboxes.forEach(
-      cb => cb.checked = !allSelected
-    );
+      updatePlayerSummary();
 
-    updatePlayerSummary();
-
-  });
+    }
+  );
 
 
-// -----------------------------
+
+// --------------------------------------------------
 // Courts
-// -----------------------------
+// --------------------------------------------------
 
-document.getElementById("courtPlus")
-  .addEventListener("click", () => {
+document
+  .getElementById("courtPlus")
+  .addEventListener(
+    "click",
+    () => {
 
-    courts++;
+      courts++;
 
-    courtCount.textContent = courts;
-
-  });
-
-
-document.getElementById("courtMinus")
-  .addEventListener("click", () => {
-
-    if (courts > 1) {
-
-      courts--;
-
-      courtCount.textContent = courts;
+      courtCount.textContent =
+        courts;
 
     }
+  );
 
-  });
 
+document
+  .getElementById("courtMinus")
+  .addEventListener(
+    "click",
+    () => {
 
-// -----------------------------
-// Generate teams
-// -----------------------------
+      if (courts > 1) {
 
-document.getElementById("generateButton")
-  .addEventListener("click", () => {
+        courts--;
 
-    const selectedPlayers =
-      [...document.querySelectorAll(
-        ".playerCheckbox:checked"
-      )];
+        courtCount.textContent =
+          courts;
 
-    if (selectedPlayers.length < 6) {
-
-      alert(
-        "Select at least 6 players."
-      );
-
-      return;
+      }
 
     }
+  );
 
-    alert(
-      `${selectedPlayers.length} players selected. ` +
-      `Team generation comes next! 🏀`
+
+
+// --------------------------------------------------
+// Helpers
+// --------------------------------------------------
+
+function stars(skill) {
+
+  return (
+    "★".repeat(skill) +
+    "☆".repeat(5 - skill)
+  );
+
+}
+
+
+function playerRow(player) {
+
+  return `
+
+    <div class="result-player">
+
+      <div>
+
+        <strong>
+          ${player.name}
+        </strong>
+
+        <span class="category">
+          ${player.category}
+        </span>
+
+      </div>
+
+      <span class="result-skill">
+        ${stars(player.skill)}
+      </span>
+
+    </div>
+
+  `;
+
+}
+
+
+function teamCard(team) {
+
+  const playersHtml =
+    team.players
+      .map(playerRow)
+      .join("");
+
+
+  return `
+
+    <div class="team-card">
+
+      <div class="team-header">
+
+        <strong>
+          ${team.name}
+        </strong>
+
+        <span>
+          Avg ${team.averageSkill.toFixed(1)}
+        </span>
+
+      </div>
+
+      ${playersHtml}
+
+    </div>
+
+  `;
+
+}
+
+
+
+// --------------------------------------------------
+// Render generated result
+// --------------------------------------------------
+
+function renderResult(result) {
+
+  const plan =
+    result.plan;
+
+
+  const formatText =
+    `${plan.teamSize} vs ${plan.teamSize}`;
+
+
+  let recommendationText = `
+
+    <div class="recommendation-title">
+
+      Recommended:
+      <strong>
+        ${formatText}
+      </strong>
+
+    </div>
+
+    <div class="recommendation-grid">
+
+      <div>
+        <strong>
+          ${plan.completeTeams}
+        </strong>
+        <span>
+          teams
+        </span>
+      </div>
+
+      <div>
+        <strong>
+          ${plan.playableCourts}
+        </strong>
+        <span>
+          courts used
+        </span>
+      </div>
+
+      <div>
+        <strong>
+          ${plan.waitingTeams}
+        </strong>
+        <span>
+          waiting teams
+        </span>
+      </div>
+
+      <div>
+        <strong>
+          ${plan.individualRotation}
+        </strong>
+        <span>
+          rotating players
+        </span>
+      </div>
+
+    </div>
+
+  `;
+
+
+  document.getElementById(
+    "recommendation"
+  ).innerHTML =
+    recommendationText;
+
+
+
+  // COURTS
+
+  const courtResults =
+    document.getElementById(
+      "courtResults"
     );
 
+
+  courtResults.innerHTML = "";
+
+
+  result.courtGames.forEach(
+    game => {
+
+      const court =
+        document.createElement(
+          "section"
+        );
+
+
+      court.className =
+        "card court-card";
+
+
+      court.innerHTML = `
+
+        <h2>
+          Court ${game.court}
+        </h2>
+
+        <div class="matchup">
+
+          ${teamCard(game.team1)}
+
+          <div class="versus">
+            VS
+          </div>
+
+          ${teamCard(game.team2)}
+
+        </div>
+
+      `;
+
+
+      courtResults.appendChild(
+        court
+      );
+
+    }
+  );
+
+
+
+  // WAITING TEAMS
+
+  const waitingSection =
+    document.getElementById(
+      "waitingSection"
+    );
+
+
+  const waitingTeams =
+    document.getElementById(
+      "waitingTeams"
+    );
+
+
+  if (
+    result.waitingTeams.length > 0
+  ) {
+
+    waitingSection.hidden =
+      false;
+
+
+    waitingTeams.innerHTML =
+      result.waitingTeams
+        .map(teamCard)
+        .join("");
+
+  }
+
+  else {
+
+    waitingSection.hidden =
+      true;
+
+  }
+
+
+
+  // ROTATING PLAYERS
+
+  const rotationSection =
+    document.getElementById(
+      "rotationSection"
+    );
+
+
+  const rotationPlayers =
+    document.getElementById(
+      "rotationPlayers"
+    );
+
+
+  if (
+    result.rotationPlayers.length > 0
+  ) {
+
+    rotationSection.hidden =
+      false;
+
+
+    rotationPlayers.innerHTML =
+      result.rotationPlayers
+        .map(playerRow)
+        .join("");
+
+  }
+
+  else {
+
+    rotationSection.hidden =
+      true;
+
+  }
+
+
+  resultsSection.hidden =
+    false;
+
+
+  resultsSection.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
   });
 
+}
 
+
+
+// --------------------------------------------------
+// Generate
+// --------------------------------------------------
+
+document
+  .getElementById(
+    "generateButton"
+  )
+  .addEventListener(
+    "click",
+    () => {
+
+      const selectedIds =
+        [
+          ...document.querySelectorAll(
+            ".playerCheckbox:checked"
+          )
+        ]
+        .map(
+          checkbox =>
+            checkbox.dataset.id
+        );
+
+
+      const selectedPlayers =
+        players.filter(
+          player =>
+            selectedIds.includes(
+              player.id
+            )
+        );
+
+
+      if (
+        selectedPlayers.length < 6
+      ) {
+
+        alert(
+          "Select at least 6 players."
+        );
+
+        return;
+
+      }
+
+
+      const formatPreference =
+        document
+          .getElementById(
+            "gameFormat"
+          )
+          .value;
+
+
+      try {
+
+        const result =
+          TeamOptimizer.generate(
+            selectedPlayers,
+            courts,
+            formatPreference
+          );
+
+
+        renderResult(result);
+
+      }
+
+      catch (error) {
+
+        alert(error.message);
+
+        console.error(error);
+
+      }
+
+    }
+  );
+
+
+
+// --------------------------------------------------
 // Start application
+// --------------------------------------------------
 
 loadPlayers();
