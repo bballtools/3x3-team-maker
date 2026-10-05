@@ -189,9 +189,33 @@ select {
 }
 
 
-.evening-history-status {
+
+/* ==================================================
+   EVENING SESSION
+================================================== */
+
+
+.evening-session-row {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    12px;
+
   margin-top:
     14px;
+}
+
+
+.evening-history-status {
+  flex:
+    1;
 
   padding:
     10px 12px;
@@ -207,6 +231,51 @@ select {
 
   font-size:
     13px;
+}
+
+
+.new-session-button {
+  flex:
+    0 0 auto;
+
+  border:
+    1px solid #d1d5db;
+
+  background:
+    white;
+
+  color:
+    #374151;
+
+  border-radius:
+    9px;
+
+  padding:
+    10px 12px;
+
+  font-size:
+    13px;
+
+  font-weight:
+    700;
+
+  cursor:
+    pointer;
+}
+
+
+.new-session-button:hover:not(:disabled) {
+  background:
+    #f9fafb;
+}
+
+
+.new-session-button:disabled {
+  opacity:
+    0.45;
+
+  cursor:
+    default;
 }
 
 
@@ -1452,6 +1521,21 @@ select {
 
 
   select {
+    width:
+      100%;
+  }
+
+
+  .evening-session-row {
+    flex-direction:
+      column;
+
+    align-items:
+      stretch;
+  }
+
+
+  .new-session-button {
     width:
       100%;
   }
