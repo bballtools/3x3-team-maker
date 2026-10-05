@@ -43,6 +43,24 @@ let lastSwapMessage = "";
 
 
 
+/*
+  Alternative suggestion state.
+
+  Suggestion #1 is the initial generated result.
+  Every genuinely new arrangement increments
+  this number.
+*/
+
+let suggestionNumber = 0;
+
+let seenSuggestionSignatures =
+  new Set();
+
+let alternativesExhausted =
+  false;
+
+
+
 // ==================================================
 // ELEMENTS
 // ==================================================
@@ -146,6 +164,12 @@ const swapStatus =
 const clearSwapButton =
   document.getElementById(
     "clearSwapButton"
+  );
+
+
+const alternativeButton =
+  document.getElementById(
+    "alternativeButton"
   );
 
 
@@ -358,9 +382,9 @@ function mergePlayerSources() {
 
 
   /*
-    If Igor has meanwhile added a local
-    newcomer to players.json, remove the
-    temporary local copy automatically.
+    If a local newcomer has meanwhile
+    been added to players.json, remove
+    the temporary local copy.
   */
 
   localPlayers =
@@ -469,7 +493,7 @@ async function loadPlayers() {
 
 
 // ==================================================
-// SORTING
+// ALPHABETICAL SORTING
 // ==================================================
 
 function sortPlayersByName(
@@ -625,6 +649,19 @@ categoryTabs
 // ==================================================
 
 function renderPlayers() {
+
+  /*
+    getVisiblePlayers() always returns
+    the players alphabetically sorted.
+
+    This applies to:
+    All
+    Kids
+    U14
+    U16
+    U18
+    18+
+  */
 
   const visiblePlayers =
     getVisiblePlayers();
@@ -1339,12 +1376,6 @@ function addLocalPlayer() {
     existing
   ) {
 
-    /*
-      Useful courtside behavior:
-      if someone tries to add an existing
-      player, simply mark them present.
-    */
-
     presentPlayerIds.add(
       existing.id
     );
@@ -1396,11 +1427,6 @@ function addLocalPlayer() {
 
   mergePlayerSources();
 
-
-  /*
-    A player added courtside is almost
-    certainly present today.
-  */
 
   presentPlayerIds.add(
     player.id
@@ -1497,7 +1523,12 @@ copyNewcomersButton
 
 
               return a.name.localeCompare(
-                b.name
+                b.name,
+                undefined,
+                {
+                  sensitivity:
+                    "base"
+                }
               );
 
             }
@@ -1533,11 +1564,6 @@ copyNewcomersButton
       }
 
       catch (error) {
-
-        /*
-          Fallback for browsers where
-          Clipboard API is unavailable.
-        */
 
         const textarea =
           document.createElement(
@@ -1692,6 +1718,82 @@ document
 
 
 // ==================================================
+// ALTERNATIVE HISTORY
+// ==================================================
+
+function resetAlternativeHistory() {
+
+  suggestionNumber =
+    0;
+
+
+  seenSuggestionSignatures =
+    new Set();
+
+
+  alternativesExhausted =
+    false;
+
+
+  updateAlternativeButton();
+
+}
+
+
+
+function updateAlternativeButton() {
+
+  if (
+    !alternativeButton
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    alternativesExhausted
+  ) {
+
+    alternativeButton.disabled =
+      true;
+
+
+    alternativeButton.textContent =
+      "✓ No more alternatives";
+
+
+    return;
+
+  }
+
+
+  alternativeButton.disabled =
+    false;
+
+
+  if (
+    suggestionNumber > 0
+  ) {
+
+    alternativeButton.textContent =
+      `🔀 Find alternative #${suggestionNumber + 1}`;
+
+  }
+
+  else {
+
+    alternativeButton.textContent =
+      "🔀 Alternative teams";
+
+  }
+
+}
+
+
+
+// ==================================================
 // INVALIDATE OLD RESULT
 // ==================================================
 
@@ -1707,6 +1809,9 @@ function invalidateResults() {
 
   lastSwapMessage =
     "";
+
+
+  resetAlternativeHistory();
 
 
   resultsSection.hidden =
@@ -2249,6 +2354,22 @@ function handlePlayerSwapClick(
     null;
 
 
+  /*
+    Remember a manually-created arrangement
+    as already seen.
+
+    This avoids presenting the exact same
+    arrangement later as a supposedly new
+    automatic alternative.
+  */
+
+  seenSuggestionSignatures.add(
+    resultSignature(
+      currentResult
+    )
+  );
+
+
   renderResult(
     currentResult,
     false
@@ -2297,12 +2418,24 @@ resultsSection
 
 // ==================================================
 // RESULT SIGNATURE
-// Used to find a genuinely different alternative.
 // ==================================================
 
 function resultSignature(
   result
 ) {
+
+  /*
+    A signature describes the actual
+    meaningful player arrangement.
+
+    Team names do NOT matter.
+    Court numbering does NOT matter.
+    Team A vs Team B side does NOT matter.
+
+    Therefore simply flipping two teams
+    or moving the same matchup to another
+    court is not treated as a new alternative.
+  */
 
   const courtsSignature =
     result.courtGames
@@ -2367,6 +2500,9 @@ function resultSignature(
 
   return JSON.stringify({
 
+    format:
+      result.plan.formatLabel,
+
     courts:
       courtsSignature,
 
@@ -2377,6 +2513,57 @@ function resultSignature(
       rotationSignature
 
   });
+
+}
+
+
+
+// ==================================================
+// ALTERNATIVE SEARCH DEPTH
+// ==================================================
+
+function alternativeSearchAttemptLimit(
+  selectedPlayers
+) {
+
+  /*
+    Larger and more diverse groups can have
+    more legitimate balanced alternatives.
+
+    The search budget therefore considers:
+    - number of participants
+    - number of different age/skill profiles
+
+    The actual decision that alternatives
+    are exhausted is still based on whether
+    the optimizer keeps returning arrangements
+    that the leader has already seen.
+  */
+
+  const profileCount =
+    new Set(
+      selectedPlayers.map(
+        player =>
+          `${player.category}|${player.skill}`
+      )
+    ).size;
+
+
+  const calculated =
+    8 +
+    Math.floor(
+      selectedPlayers.length / 2
+    ) +
+    profileCount;
+
+
+  return Math.max(
+    12,
+    Math.min(
+      28,
+      calculated
+    )
+  );
 
 }
 
@@ -2400,10 +2587,28 @@ function getPresentPlayers() {
 
 
 // ==================================================
+// SMALL UI YIELD
+// ==================================================
+
+function allowBrowserToPaint() {
+
+  return new Promise(
+    resolve =>
+      setTimeout(
+        resolve,
+        0
+      )
+  );
+
+}
+
+
+
+// ==================================================
 // GENERATE RESULT
 // ==================================================
 
-function generateTeams(
+async function generateTeams(
   alternative = false
 ) {
 
@@ -2443,76 +2648,215 @@ function generateTeams(
       "";
 
 
-    let result =
-      TeamOptimizer.generate(
-        selectedPlayers,
-        courts,
-        formatPreference
-      );
-
-
-    /*
-      When Alternative is requested,
-      try several times to find a genuinely
-      different arrangement.
-    */
+    // ==================================================
+    // FIRST SUGGESTION
+    // ==================================================
 
     if (
-      alternative &&
-      currentResult
+      !alternative
     ) {
 
-      const previousSignature =
-        resultSignature(
-          currentResult
+      resetAlternativeHistory();
+
+
+      const result =
+        TeamOptimizer.generate(
+          selectedPlayers,
+          courts,
+          formatPreference
         );
 
 
-      for (
-        let attempt = 0;
-        attempt < 10;
-        attempt++
+      suggestionNumber =
+        1;
+
+
+      seenSuggestionSignatures.add(
+        resultSignature(
+          result
+        )
+      );
+
+
+      renderResult(
+        result
+      );
+
+
+      return;
+
+    }
+
+
+
+    // ==================================================
+    // ALTERNATIVE SUGGESTION
+    // ==================================================
+
+    if (
+      !currentResult
+    ) {
+
+      await generateTeams(
+        false
+      );
+
+
+      return;
+
+    }
+
+
+    if (
+      alternativesExhausted
+    ) {
+
+      alert(
+        "No more meaningful alternatives could be found for the current players and settings."
+      );
+
+
+      return;
+
+    }
+
+
+    alternativeButton.disabled =
+      true;
+
+
+    alternativeButton.textContent =
+      "Searching…";
+
+
+    /*
+      Give the browser a chance to display
+      the searching state before the
+      optimizer starts doing work.
+    */
+
+    await allowBrowserToPaint();
+
+
+    const attemptLimit =
+      alternativeSearchAttemptLimit(
+        selectedPlayers
+      );
+
+
+    let foundResult =
+      null;
+
+
+    let foundSignature =
+      null;
+
+
+    for (
+      let attempt = 0;
+      attempt < attemptLimit;
+      attempt++
+    ) {
+
+      const candidate =
+        TeamOptimizer.generate(
+          selectedPlayers,
+          courts,
+          formatPreference
+        );
+
+
+      const signature =
+        resultSignature(
+          candidate
+        );
+
+
+      if (
+        !seenSuggestionSignatures.has(
+          signature
+        )
       ) {
 
-        const candidate =
-          TeamOptimizer.generate(
-            selectedPlayers,
-            courts,
-            formatPreference
-          );
-
-
-        if (
-          resultSignature(
-            candidate
-          ) !==
-          previousSignature
-        ) {
-
-          result =
-            candidate;
-
-
-          break;
-
-        }
-
-
-        result =
+        foundResult =
           candidate;
+
+
+        foundSignature =
+          signature;
+
+
+        break;
+
+      }
+
+
+      /*
+        Occasionally yield control so that
+        the mobile browser remains responsive
+        during a longer alternative search.
+      */
+
+      if (
+        (attempt + 1) % 4 === 0
+      ) {
+
+        await allowBrowserToPaint();
 
       }
 
     }
 
 
-    renderResult(
-      result
+
+    // ==================================================
+    // NEW ALTERNATIVE FOUND
+    // ==================================================
+
+    if (
+      foundResult
+    ) {
+
+      suggestionNumber++;
+
+
+      seenSuggestionSignatures.add(
+        foundSignature
+      );
+
+
+      renderResult(
+        foundResult
+      );
+
+
+      return;
+
+    }
+
+
+
+    // ==================================================
+    // NO FURTHER MEANINGFUL ALTERNATIVE FOUND
+    // ==================================================
+
+    alternativesExhausted =
+      true;
+
+
+    updateAlternativeButton();
+
+
+    alert(
+      "No more meaningful alternatives could be found for this group with the current courts and game format.\n\nThe available balanced variations are limited by the number of players, their age categories and their skill levels."
     );
 
   }
 
   catch (error) {
+
+    updateAlternativeButton();
+
 
     alert(
       error.message
@@ -2554,10 +2898,7 @@ document
 // ALTERNATIVE BUTTON
 // ==================================================
 
-document
-  .getElementById(
-    "alternativeButton"
-  )
+alternativeButton
   .addEventListener(
     "click",
     () => {
@@ -2625,12 +2966,23 @@ function renderResult(
     )
     .innerHTML = `
 
-      <div class="recommendation-title">
+      <div class="recommendation-heading-row">
 
-        Recommended:
-        <strong>
-          ${escapeHtml(formatText)}
-        </strong>
+        <div class="recommendation-title">
+
+          Recommended:
+          <strong>
+            ${escapeHtml(formatText)}
+          </strong>
+
+        </div>
+
+
+        <div class="suggestion-badge">
+
+          Suggestion #${suggestionNumber}
+
+        </div>
 
       </div>
 
@@ -2868,6 +3220,8 @@ function renderResult(
 
 
   updateSwapStatus();
+
+  updateAlternativeButton();
 
 
   if (
