@@ -150,6 +150,226 @@
     </div>
 
 
+
+    <!-- CATEGORY TABS -->
+
+    <div
+      id="categoryTabs"
+      class="category-tabs"
+    ></div>
+
+
+
+    <!-- ADD PLAYER TOOLBAR -->
+
+    <div class="player-toolbar">
+
+      <button
+        id="addPlayerButton"
+        class="add-player-button"
+        type="button"
+      >
+        + Add player
+      </button>
+
+    </div>
+
+
+
+    <!-- QUICK ADD FORM -->
+
+    <div
+      id="quickAddForm"
+      class="quick-add-form"
+      hidden
+    >
+
+      <div class="quick-add-header">
+
+        <div>
+
+          <strong id="quickAddTitle">
+            Add player
+          </strong>
+
+          <p id="quickAddDescription">
+            Add a player for this and future sessions on this device.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="form-field">
+
+        <label for="newPlayerName">
+          Name
+        </label>
+
+        <input
+          id="newPlayerName"
+          type="text"
+          maxlength="40"
+          autocomplete="off"
+          placeholder="Player name"
+        >
+
+      </div>
+
+
+      <div
+        id="quickAddCategoryRow"
+        class="form-field"
+      >
+
+        <label for="newPlayerCategory">
+          Category
+        </label>
+
+        <select id="newPlayerCategory">
+
+          <option value="Kids">
+            Kids
+          </option>
+
+          <option value="U14">
+            U14
+          </option>
+
+          <option value="U16">
+            U16
+          </option>
+
+          <option value="U18">
+            U18
+          </option>
+
+          <option value="18+">
+            18+
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="form-field">
+
+        <label>
+          Skill level
+        </label>
+
+        <div
+          id="skillSelector"
+          class="skill-selector"
+        >
+
+          <button
+            type="button"
+            class="skill-option"
+            data-skill="1"
+          >
+            1★
+          </button>
+
+          <button
+            type="button"
+            class="skill-option"
+            data-skill="2"
+          >
+            2★
+          </button>
+
+          <button
+            type="button"
+            class="skill-option active"
+            data-skill="3"
+          >
+            3★
+          </button>
+
+          <button
+            type="button"
+            class="skill-option"
+            data-skill="4"
+          >
+            4★
+          </button>
+
+          <button
+            type="button"
+            class="skill-option"
+            data-skill="5"
+          >
+            5★
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="quick-add-actions">
+
+        <button
+          id="cancelAddPlayer"
+          type="button"
+          class="secondary"
+        >
+          Cancel
+        </button>
+
+
+        <button
+          id="saveNewPlayer"
+          type="button"
+          class="save-player-button"
+        >
+          Add player
+        </button>
+
+      </div>
+
+    </div>
+
+
+
+    <!-- LOCAL NEWCOMER INFO -->
+
+    <div
+      id="newcomerTools"
+      class="newcomer-tools"
+      hidden
+    >
+
+      <div>
+
+        <strong id="newcomerCount">
+          0 new players
+        </strong>
+
+        <p>
+          Saved only on this device until added to the central roster.
+        </p>
+
+      </div>
+
+
+      <button
+        id="copyNewcomers"
+        type="button"
+        class="secondary"
+      >
+        Copy newcomer list
+      </button>
+
+    </div>
+
+
+
+    <!-- PLAYERS -->
+
     <div id="playerList"></div>
 
   </section>
@@ -157,7 +377,7 @@
 
 
   <!-- ==================================================
-       GENERATE BUTTON
+       GENERATE
   =================================================== -->
 
   <button
@@ -187,6 +407,26 @@
       id="recommendation"
       class="card recommendation-card"
     ></div>
+
+
+
+    <!-- ALTERNATIVE RESULT -->
+
+    <div class="result-actions">
+
+      <button
+        id="alternativeButton"
+        type="button"
+        class="alternative-button"
+      >
+        🔀 Alternative teams
+      </button>
+
+      <p>
+        Generate another balanced suggestion using the same players and settings.
+      </p>
+
+    </div>
 
 
 
@@ -251,7 +491,7 @@
 
 
 
-    <!-- INDIVIDUAL ROTATION -->
+    <!-- ROTATION PLAYERS -->
 
     <section
       id="rotationSection"
