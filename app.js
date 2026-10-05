@@ -228,6 +228,12 @@ const eveningHistoryStatus =
   );
 
 
+const startNewSessionButton =
+  document.getElementById(
+    "startNewSessionButton"
+  );
+
+
 const manualAdjustmentCard =
   document.getElementById(
     "manualAdjustmentCard"
@@ -310,6 +316,34 @@ function getTodayKey() {
 
 
 // ==================================================
+// NEW SESSION BUTTON STATE
+// ==================================================
+
+function updateNewSessionButtonState() {
+
+  if (
+    !startNewSessionButton
+  ) {
+
+    return;
+
+  }
+
+
+  const hasSessionState =
+    approvedFormations.length > 0 ||
+    presentPlayerIds.size > 0 ||
+    currentResult !== null;
+
+
+  startNewSessionButton.disabled =
+    !hasSessionState;
+
+}
+
+
+
+// ==================================================
 // EVENING SESSION HISTORY
 // ==================================================
 
@@ -349,8 +383,8 @@ function loadEveningSession() {
 
 
     /*
-      History automatically starts fresh
-      on a new calendar day.
+      Session history automatically starts
+      fresh on a new calendar day.
     */
 
     if (
@@ -476,31 +510,141 @@ function renderEveningHistoryStatus() {
   ) {
 
     eveningHistoryStatus.textContent =
-      "No approved rounds yet today.";
-
-
-    return;
+      "No approved rounds in the current session.";
 
   }
 
-
-  if (
+  else if (
     count === 1
   ) {
 
     eveningHistoryStatus.textContent =
-      "1 approved round remembered today.";
+      "Current session · 1 approved round remembered.";
 
+  }
+
+  else {
+
+    eveningHistoryStatus.textContent =
+      `Current session · ${count} approved rounds remembered.`;
+
+  }
+
+
+  updateNewSessionButtonState();
+
+}
+
+
+
+// ==================================================
+// START COMPLETELY NEW SESSION
+// ==================================================
+
+function startNewSession() {
+
+  const hasSessionState =
+    approvedFormations.length > 0 ||
+    presentPlayerIds.size > 0 ||
+    currentResult !== null;
+
+
+  if (
+    !hasSessionState
+  ) {
 
     return;
 
   }
 
 
-  eveningHistoryStatus.textContent =
-    `${count} approved rounds remembered today.`;
+  const confirmed =
+    window.confirm(
+      "Start a new session?\n\n" +
+      "This will forget all approved rounds from the current session, clear attendance and return to Round 1.\n\n" +
+      "The central player roster and locally saved newcomers will stay."
+    );
+
+
+  if (
+    !confirmed
+  ) {
+
+    return;
+
+  }
+
+
+  /*
+    Remove ONLY the current session history.
+
+    Do not touch:
+    - central players
+    - local newcomers
+    - newcomer storage
+  */
+
+  localStorage.removeItem(
+    EVENING_SESSION_KEY
+  );
+
+
+  approvedFormations =
+    [];
+
+
+  presentPlayerIds =
+    new Set();
+
+
+  currentResult =
+    null;
+
+
+  selectedSwapPlayer =
+    null;
+
+
+  lastSwapMessage =
+    "";
+
+
+  currentRoundNumber =
+    1;
+
+
+  currentRoundApproved =
+    false;
+
+
+  activeCategory =
+    "All";
+
+
+  resetAlternativeHistory();
+
+
+  resultsSection.hidden =
+    true;
+
+
+  closeQuickAddForm();
+
+
+  renderEveningHistoryStatus();
+
+
+  renderPlayerInterface();
 
 }
+
+
+
+startNewSessionButton
+  .addEventListener(
+    "click",
+    startNewSession
+  );
 
 
 
@@ -1102,6 +1246,8 @@ function updatePlayerSummary() {
 
 
   updateSelectAllButton();
+
+  updateNewSessionButtonState();
 
 }
 
@@ -2044,6 +2190,9 @@ function invalidateResults() {
   resultsSection.hidden =
     true;
 
+
+  updateNewSessionButtonState();
+
 }
 
 
@@ -2256,17 +2405,6 @@ function findTeam(
 function resultSignature(
   result
 ) {
-
-  /*
-    "Formation" means team composition.
-
-    Changing:
-    - court number
-    - Team A / Team B order
-    - which side of VS
-
-    does NOT create a new formation.
-  */
 
   const teams =
     result.teams
@@ -2743,11 +2881,6 @@ function handlePlayerSwapClick(
     null;
 
 
-  /*
-    Remember the manually adjusted result as one
-    of the suggestions already seen this round.
-  */
-
   seenSuggestionSignatures.add(
     resultSignature(
       currentResult
@@ -2902,11 +3035,6 @@ async function generateInitialSuggestion(
     null;
 
 
-  /*
-    Try to start the new round with a formation
-    that has not previously been approved today.
-  */
-
   for (
     let attempt = 0;
     attempt < attemptLimit;
@@ -2976,12 +3104,6 @@ async function generateInitialSuggestion(
 
   }
 
-
-  /*
-    If every high-quality result we found has
-    already been used, repetition is probably
-    unavoidable for this participant mix.
-  */
 
   currentRepeatNotice =
     approvedFormations.length > 0;
@@ -3882,6 +4004,8 @@ function renderResult(
   updateRoundControls();
 
   renderEveningHistoryStatus();
+
+  updateNewSessionButtonState();
 
 
   if (
