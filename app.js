@@ -1,5 +1,13 @@
 let players = [];
+
 let courts = 2;
+
+let currentResult = null;
+
+let selectedSwapPlayer = null;
+
+let lastSwapMessage = "";
+
 
 
 const playerList =
@@ -23,6 +31,18 @@ const courtCount =
 const resultsSection =
   document.getElementById(
     "resultsSection"
+  );
+
+
+const swapStatus =
+  document.getElementById(
+    "swapStatus"
+  );
+
+
+const clearSwapButton =
+  document.getElementById(
+    "clearSwapButton"
   );
 
 
@@ -287,13 +307,29 @@ function stars(skill) {
 
 
 
-function playerRow(player) {
+function playerRow(
+  player,
+  teamId
+) {
+
+  const selected =
+    selectedSwapPlayer &&
+    selectedSwapPlayer.teamId ===
+      teamId &&
+    selectedSwapPlayer.playerId ===
+      player.id;
+
 
   return `
 
-    <div class="result-player">
+    <button
+      type="button"
+      class="result-player swap-player${selected ? " selected-swap-player" : ""}"
+      data-team-id="${teamId}"
+      data-player-id="${player.id}"
+    >
 
-      <div>
+      <span class="result-player-left">
 
         <strong>
           ${player.name}
@@ -303,7 +339,7 @@ function playerRow(player) {
           ${player.category}
         </span>
 
-      </div>
+      </span>
 
       <span class="result-skill">
         ${stars(
@@ -311,7 +347,7 @@ function playerRow(player) {
         )}
       </span>
 
-    </div>
+    </button>
 
   `;
 
@@ -324,7 +360,11 @@ function teamCard(team) {
   const playersHtml =
     team.players
       .map(
-        playerRow
+        player =>
+          playerRow(
+            player,
+            team.id
+          )
       )
       .join("");
 
@@ -355,11 +395,488 @@ function teamCard(team) {
 
 
 
+function rotationPlayerRow(
+  player
+) {
+
+  return `
+
+    <div class="result-player rotation-player">
+
+      <span class="result-player-left">
+
+        <strong>
+          ${player.name}
+        </strong>
+
+        <span class="category">
+          ${player.category}
+        </span>
+
+      </span>
+
+      <span class="result-skill">
+        ${stars(
+          player.skill
+        )}
+      </span>
+
+    </div>
+
+  `;
+
+}
+
+
+
+// ==================================================
+// RECALCULATE TEAM AFTER MANUAL SWAP
+// ==================================================
+
+function recalculateTeam(
+  team
+) {
+
+  team.totalSkill =
+    team.players.reduce(
+      (sum, player) =>
+        sum + player.skill,
+      0
+    );
+
+
+  team.averageSkill =
+    team.totalSkill /
+    team.players.length;
+
+}
+
+
+
+// ==================================================
+// FIND TEAM
+// ==================================================
+
+function findTeam(
+  teamId
+) {
+
+  if (
+    !currentResult
+  ) {
+
+    return null;
+
+  }
+
+
+  return (
+    currentResult.teams.find(
+      team =>
+        team.id === teamId
+    ) || null
+  );
+
+}
+
+
+
+// ==================================================
+// SWAP STATUS
+// ==================================================
+
+function updateSwapStatus() {
+
+  if (
+    lastSwapMessage
+  ) {
+
+    swapStatus.textContent =
+      lastSwapMessage;
+
+
+    clearSwapButton.disabled =
+      !selectedSwapPlayer;
+
+
+    return;
+
+  }
+
+
+  if (
+    !selectedSwapPlayer
+  ) {
+
+    swapStatus.textContent =
+      "Tap a player, then tap a player from another team to swap them.";
+
+
+    clearSwapButton.disabled =
+      true;
+
+
+    return;
+
+  }
+
+
+  const team =
+    findTeam(
+      selectedSwapPlayer.teamId
+    );
+
+
+  const player =
+    team
+      ? team.players.find(
+          item =>
+            item.id ===
+            selectedSwapPlayer.playerId
+        )
+      : null;
+
+
+  if (
+    player
+  ) {
+
+    swapStatus.textContent =
+      `${player.name} selected. Now choose a player from another team.`;
+
+
+    clearSwapButton.disabled =
+      false;
+
+  }
+
+}
+
+
+
+// ==================================================
+// CLEAR SWAP
+// ==================================================
+
+function clearSwapSelection() {
+
+  selectedSwapPlayer =
+    null;
+
+
+  lastSwapMessage =
+    "";
+
+
+  if (
+    currentResult
+  ) {
+
+    renderResult(
+      currentResult,
+      false
+    );
+
+  }
+
+}
+
+
+
+clearSwapButton
+  .addEventListener(
+    "click",
+    clearSwapSelection
+  );
+
+
+
+// ==================================================
+// MANUAL PLAYER SWAP
+// ==================================================
+
+function handlePlayerSwapClick(
+  teamId,
+  playerId
+) {
+
+  const team =
+    findTeam(
+      teamId
+    );
+
+
+  if (
+    !team
+  ) {
+
+    return;
+
+  }
+
+
+  const player =
+    team.players.find(
+      item =>
+        item.id === playerId
+    );
+
+
+  if (
+    !player
+  ) {
+
+    return;
+
+  }
+
+
+  // ------------------------------------------------
+  // FIRST PLAYER
+  // ------------------------------------------------
+
+  if (
+    !selectedSwapPlayer
+  ) {
+
+    selectedSwapPlayer = {
+
+      teamId,
+
+      playerId
+
+    };
+
+
+    lastSwapMessage =
+      "";
+
+
+    renderResult(
+      currentResult,
+      false
+    );
+
+
+    return;
+
+  }
+
+
+  // ------------------------------------------------
+  // TAP SAME PLAYER AGAIN = CANCEL
+  // ------------------------------------------------
+
+  if (
+    selectedSwapPlayer.teamId ===
+      teamId &&
+    selectedSwapPlayer.playerId ===
+      playerId
+  ) {
+
+    selectedSwapPlayer =
+      null;
+
+
+    lastSwapMessage =
+      "";
+
+
+    renderResult(
+      currentResult,
+      false
+    );
+
+
+    return;
+
+  }
+
+
+  // ------------------------------------------------
+  // TAP ANOTHER PLAYER IN SAME TEAM
+  // = CHANGE SELECTION
+  // ------------------------------------------------
+
+  if (
+    selectedSwapPlayer.teamId ===
+      teamId
+  ) {
+
+    selectedSwapPlayer = {
+
+      teamId,
+
+      playerId
+
+    };
+
+
+    lastSwapMessage =
+      "";
+
+
+    renderResult(
+      currentResult,
+      false
+    );
+
+
+    return;
+
+  }
+
+
+  // ------------------------------------------------
+  // SECOND PLAYER FROM ANOTHER TEAM
+  // ------------------------------------------------
+
+  const firstTeam =
+    findTeam(
+      selectedSwapPlayer.teamId
+    );
+
+
+  const secondTeam =
+    team;
+
+
+  if (
+    !firstTeam ||
+    !secondTeam
+  ) {
+
+    return;
+
+  }
+
+
+  const firstIndex =
+    firstTeam.players.findIndex(
+      item =>
+        item.id ===
+        selectedSwapPlayer.playerId
+    );
+
+
+  const secondIndex =
+    secondTeam.players.findIndex(
+      item =>
+        item.id ===
+        playerId
+    );
+
+
+  if (
+    firstIndex === -1 ||
+    secondIndex === -1
+  ) {
+
+    return;
+
+  }
+
+
+  const firstPlayer =
+    firstTeam.players[
+      firstIndex
+    ];
+
+
+  const secondPlayer =
+    secondTeam.players[
+      secondIndex
+    ];
+
+
+  firstTeam.players[
+    firstIndex
+  ] =
+    secondPlayer;
+
+
+  secondTeam.players[
+    secondIndex
+  ] =
+    firstPlayer;
+
+
+  recalculateTeam(
+    firstTeam
+  );
+
+
+  recalculateTeam(
+    secondTeam
+  );
+
+
+  lastSwapMessage =
+    `Swapped ${firstPlayer.name} and ${secondPlayer.name}.`;
+
+
+  selectedSwapPlayer =
+    null;
+
+
+  renderResult(
+    currentResult,
+    false
+  );
+
+}
+
+
+
+// ==================================================
+// RESULT CLICK HANDLER
+// ==================================================
+
+resultsSection
+  .addEventListener(
+    "click",
+    event => {
+
+      const playerButton =
+        event.target.closest(
+          ".swap-player"
+        );
+
+
+      if (
+        !playerButton
+      ) {
+
+        return;
+
+      }
+
+
+      handlePlayerSwapClick(
+
+        playerButton.dataset.teamId,
+
+        playerButton.dataset.playerId
+
+      );
+
+    }
+  );
+
+
+
 // ==================================================
 // RESULT RENDERING
 // ==================================================
 
-function renderResult(result) {
+function renderResult(
+  result,
+  shouldScroll = true
+) {
+
+  currentResult =
+    result;
+
 
   const plan =
     result.plan;
@@ -374,7 +891,8 @@ function renderResult(result) {
     );
 
 
-  let specialNote = "";
+  let specialNote =
+    "";
 
 
   if (
@@ -383,15 +901,11 @@ function renderResult(result) {
 
     specialNote = `
 
-      <div
-        style="
-          margin-top: 14px;
-          font-size: 14px;
-          color: #6b7280;
-        "
-      >
+      <div class="recommendation-note">
+
         Kids court reserved as 3v3.
         Younger players are added where needed.
+
       </div>
 
     `;
@@ -409,6 +923,7 @@ function renderResult(result) {
       </strong>
 
     </div>
+
 
     <div class="recommendation-grid">
 
@@ -561,6 +1076,12 @@ function renderResult(result) {
     );
 
 
+  const waitingTitle =
+    document.getElementById(
+      "waitingTitle"
+    );
+
+
   const waitingTeams =
     document.getElementById(
       "waitingTeams"
@@ -573,6 +1094,12 @@ function renderResult(result) {
 
     waitingSection.hidden =
       false;
+
+
+    waitingTitle.textContent =
+      result.waitingTeams.length === 1
+        ? "Next team"
+        : "Next teams";
 
 
     waitingTeams.innerHTML =
@@ -620,7 +1147,7 @@ function renderResult(result) {
     rotationPlayers.innerHTML =
       result.rotationPlayers
         .map(
-          playerRow
+          rotationPlayerRow
         )
         .join("");
 
@@ -639,15 +1166,24 @@ function renderResult(result) {
     false;
 
 
-  resultsSection.scrollIntoView({
+  updateSwapStatus();
 
-    behavior:
-      "smooth",
 
-    block:
-      "start"
+  if (
+    shouldScroll
+  ) {
 
-  });
+    resultsSection.scrollIntoView({
+
+      behavior:
+        "smooth",
+
+      block:
+        "start"
+
+    });
+
+  }
 
 }
 
@@ -709,6 +1245,14 @@ document
 
 
       try {
+
+        selectedSwapPlayer =
+          null;
+
+
+        lastSwapMessage =
+          "";
+
 
         const result =
           TeamOptimizer.generate(
