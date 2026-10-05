@@ -114,6 +114,14 @@
 
     </div>
 
+
+    <div
+      id="eveningHistoryStatus"
+      class="evening-history-status"
+    >
+      No approved rounds yet today.
+    </div>
+
   </section>
 
 
@@ -151,16 +159,12 @@
 
 
 
-    <!-- CATEGORY TABS -->
-
     <div
       id="categoryTabs"
       class="category-tabs"
     ></div>
 
 
-
-    <!-- ADD PLAYER TOOLBAR -->
 
     <div class="player-toolbar">
 
@@ -175,8 +179,6 @@
     </div>
 
 
-
-    <!-- QUICK ADD FORM -->
 
     <div
       id="quickAddForm"
@@ -335,8 +337,6 @@
 
 
 
-    <!-- LOCAL NEWCOMER INFO -->
-
     <div
       id="newcomerTools"
       class="newcomer-tools"
@@ -367,8 +367,6 @@
     </div>
 
 
-
-    <!-- PLAYERS -->
 
     <div id="playerList"></div>
 
@@ -401,8 +399,6 @@
   >
 
 
-    <!-- RECOMMENDATION -->
-
     <div
       id="recommendation"
       class="card recommendation-card"
@@ -410,23 +406,59 @@
 
 
 
-    <!-- ALTERNATIVE RESULT -->
+    <!-- ROUND CONTROLS -->
 
-    <div class="result-actions">
+    <section class="card round-controls-card">
 
-      <button
-        id="alternativeButton"
-        type="button"
-        class="alternative-button"
-      >
-        🔀 Alternative teams
-      </button>
+      <div class="round-controls-header">
 
-      <p>
-        Generate another balanced suggestion using the same players and settings.
-      </p>
+        <div>
 
-    </div>
+          <h2>
+            Round controls
+          </h2>
+
+          <p id="roundActionHelp">
+            Review the teams, make any swaps, then approve the formation that will actually be used.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="round-buttons">
+
+        <button
+          id="alternativeButton"
+          type="button"
+          class="alternative-button"
+        >
+          🔀 Find alternative #2
+        </button>
+
+
+        <button
+          id="approveFormationButton"
+          type="button"
+          class="approve-button"
+        >
+          ✅ Use this formation
+        </button>
+
+
+        <button
+          id="remixButton"
+          type="button"
+          class="remix-button"
+          hidden
+        >
+          🔄 Reset &amp; remix teams
+        </button>
+
+      </div>
+
+    </section>
 
 
 
@@ -467,13 +499,9 @@
 
 
 
-    <!-- COURTS -->
-
     <div id="courtResults"></div>
 
 
-
-    <!-- WAITING TEAMS -->
 
     <section
       id="waitingSection"
@@ -490,8 +518,6 @@
     </section>
 
 
-
-    <!-- ROTATION PLAYERS -->
 
     <section
       id="rotationSection"
