@@ -33,6 +33,12 @@ button {
 }
 
 
+
+/* ==================================================
+   HEADER
+================================================== */
+
+
 header {
   background:
     #111827;
@@ -41,7 +47,7 @@ header {
     white;
 
   padding:
-    18px 20px;
+    14px 20px;
 
   display:
     flex;
@@ -51,6 +57,15 @@ header {
 
   align-items:
     center;
+
+  gap:
+    16px;
+}
+
+
+.header-title {
+  min-width:
+    0;
 }
 
 
@@ -71,10 +86,122 @@ header p {
 }
 
 
+.header-right {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    flex-end;
+
+  gap:
+    14px;
+
+  flex:
+    0 0 auto;
+}
+
+
+
+/* ==================================================
+   3X3 UNITES LOGO
+================================================== */
+
+
+.unites-lockup {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  background:
+    white;
+
+  border-radius:
+    10px;
+
+  padding:
+    7px 11px 6px;
+
+  min-width:
+    125px;
+
+  box-shadow:
+    0 2px 6px
+    rgba(0, 0, 0, 0.18);
+}
+
+
+.unites-logo {
+  display:
+    block;
+
+  width:
+    112px;
+
+  height:
+    auto;
+
+  max-height:
+    45px;
+
+  object-fit:
+    contain;
+}
+
+
+.unites-city {
+  width:
+    100%;
+
+  margin-top:
+    4px;
+
+  padding-top:
+    4px;
+
+  border-top:
+    1px solid #e5e7eb;
+
+  text-align:
+    center;
+
+  color:
+    #111827;
+
+  font-size:
+    11px;
+
+  font-weight:
+    700;
+
+  letter-spacing:
+    0.6px;
+}
+
+
 .ball {
   font-size:
     32px;
+
+  line-height:
+    1;
 }
+
+
+
+/* ==================================================
+   GENERAL LAYOUT
+================================================== */
 
 
 main {
@@ -1510,6 +1637,66 @@ select {
 @media (
   max-width: 600px
 ) {
+
+  header {
+    padding:
+      12px 14px;
+
+    gap:
+      10px;
+  }
+
+
+  header h1 {
+    font-size:
+      20px;
+  }
+
+
+  header p {
+    font-size:
+      12px;
+  }
+
+
+  .header-right {
+    gap:
+      8px;
+  }
+
+
+  .unites-lockup {
+    min-width:
+      100px;
+
+    padding:
+      5px 7px;
+  }
+
+
+  .unites-logo {
+    width:
+      90px;
+
+    max-height:
+      36px;
+  }
+
+
+  .unites-city {
+    font-size:
+      9px;
+
+    letter-spacing:
+      0.4px;
+  }
+
+
+  .ball {
+    font-size:
+      27px;
+  }
+
 
   .setting-row {
     align-items:
