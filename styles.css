@@ -205,6 +205,18 @@ select {
 
   cursor:
     pointer;
+
+  color:
+    #1f2937;
+}
+
+
+.secondary:disabled {
+  opacity:
+    0.45;
+
+  cursor:
+    default;
 }
 
 
@@ -305,9 +317,9 @@ select {
 
 
 
-/* -----------------------------
+/* ==================================================
    RESULTS
------------------------------- */
+================================================== */
 
 
 .results-section {
@@ -380,6 +392,72 @@ select {
   color:
     #6b7280;
 }
+
+
+.recommendation-note {
+  margin-top:
+    14px;
+
+  color:
+    #6b7280;
+
+  font-size:
+    14px;
+}
+
+
+
+/* ==================================================
+   MANUAL ADJUSTMENTS
+================================================== */
+
+
+.manual-card {
+  border-left:
+    5px solid #111827;
+}
+
+
+.manual-header {
+  display:
+    flex;
+
+  justify-content:
+    space-between;
+
+  align-items:
+    flex-start;
+
+  gap:
+    16px;
+}
+
+
+.manual-header h2 {
+  margin-bottom:
+    6px;
+}
+
+
+.manual-header p {
+  margin:
+    0;
+
+  color:
+    #6b7280;
+
+  font-size:
+    14px;
+
+  line-height:
+    1.4;
+}
+
+
+
+/* ==================================================
+   COURTS / TEAMS
+================================================== */
 
 
 .court-card h2 {
@@ -460,7 +538,16 @@ select {
 }
 
 
+
+/* ==================================================
+   RESULT PLAYERS
+================================================== */
+
+
 .result-player {
+  width:
+    100%;
+
   display:
     flex;
 
@@ -473,14 +560,85 @@ select {
   padding:
     10px 12px;
 
+  border:
+    none;
+
   border-top:
     1px solid #e5e7eb;
+
+  background:
+    white;
+
+  color:
+    #1f2937;
+
+  text-align:
+    left;
+
+  font:
+    inherit;
 }
 
 
 .result-player:first-of-type {
   border-top:
     none;
+}
+
+
+.swap-player {
+  cursor:
+    pointer;
+
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.swap-player:hover {
+  background:
+    #f9fafb;
+}
+
+
+.swap-player:active {
+  background:
+    #f3f4f6;
+}
+
+
+.selected-swap-player {
+  background:
+    #fff7ed;
+
+  box-shadow:
+    inset 4px 0 0
+    #f97316;
+}
+
+
+.selected-swap-player:hover {
+  background:
+    #fff7ed;
+}
+
+
+.rotation-player {
+  cursor:
+    default;
+}
+
+
+.result-player-left {
+  display:
+    flex;
+
+  align-items:
+    baseline;
+
+  min-width:
+    0;
 }
 
 
@@ -502,6 +660,9 @@ select {
 
   white-space:
     nowrap;
+
+  margin-left:
+    10px;
 }
 
 
@@ -513,6 +674,11 @@ select {
     14px;
 }
 
+
+
+/* ==================================================
+   MOBILE
+================================================== */
 
 
 @media (
@@ -552,6 +718,18 @@ select {
 
     padding:
       3px;
+  }
+
+
+  .manual-header {
+    flex-direction:
+      column;
+  }
+
+
+  .manual-header button {
+    width:
+      100%;
   }
 
 }
