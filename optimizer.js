@@ -272,8 +272,7 @@
 
     /*
       Loose individual players are
-      less desirable than a complete
-      waiting team.
+      less desirable than complete teams.
     */
 
     score +=
@@ -281,7 +280,8 @@
 
 
     /*
-      Complete waiting teams are fine.
+      Complete waiting teams are
+      absolutely acceptable.
     */
 
     score +=
@@ -297,7 +297,7 @@
 
 
     /*
-      3v3 remains the primary format.
+      3v3 remains the main format.
     */
 
     if (
@@ -528,11 +528,6 @@
           remainingCounts[category];
 
 
-        /*
-          Avoid completely removing an
-          age category unnecessarily.
-        */
-
         if (
           before > 0 &&
           after === 0
@@ -542,11 +537,6 @@
 
         }
 
-
-        /*
-          Avoid leaving one isolated
-          player in a category.
-        */
 
         if (
           after === 1
@@ -1037,12 +1027,6 @@
       mask++
     ) {
 
-      /*
-        Player zero always stays in
-        Team 1 to avoid mirrored
-        duplicate combinations.
-      */
-
       if (
         (mask & 1) === 0
       ) {
@@ -1172,11 +1156,8 @@
 
 
     /*
-      Special Kids court is used when
-      there are 2–5 Kids.
-
-      Six Kids already make a complete
-      standalone 3v3 game.
+      2–5 Kids trigger the dedicated
+      3v3 Kids court.
     */
 
     if (
@@ -1194,9 +1175,8 @@
 
 
     /*
-      U14 is the preferred source.
-
-      U16 is allowed only as a fallback.
+      U14 first.
+      U16 only if needed.
     */
 
     const eligibleFillers =
@@ -1236,13 +1216,12 @@
         let score = 0;
 
 
-        /*
-          Strongly prefer U14 players
-          over U16 players.
-        */
-
         fillers.forEach(
           player => {
+
+            /*
+              Strongly prefer U14.
+            */
 
             if (
               player.category ===
@@ -1255,9 +1234,8 @@
 
 
             /*
-              When playing down,
-              lower-skilled players
-              are preferred.
+              Prefer lower-skilled players
+              when playing down.
             */
 
             score +=
@@ -1385,6 +1363,432 @@
         item =>
           item.player
       );
+
+  }
+
+
+
+  // ==================================================
+  // WAITING TEAM BALANCE
+  // ==================================================
+
+  function waitingTeamInternalScore(
+    players
+  ) {
+
+    let score = 0;
+
+
+    const ranks =
+      players.map(
+        player =>
+          categoryRank(
+            player.category
+          )
+      );
+
+
+    const spread =
+      Math.max(...ranks) -
+      Math.min(...ranks);
+
+
+    score +=
+      spread * 35;
+
+
+    const categories =
+      new Set(
+        players.map(
+          player =>
+            player.category
+        )
+      );
+
+
+    if (
+      categories.size > 2
+    ) {
+
+      score +=
+        (
+          categories.size - 2
+        ) * 30;
+
+    }
+
+
+    const elite =
+      players.filter(
+        player =>
+          player.skill === 5
+      ).length;
+
+
+    if (
+      elite > 1
+    ) {
+
+      score +=
+        (
+          elite - 1
+        ) * 120;
+
+    }
+
+
+    return score;
+
+  }
+
+
+
+  function waitingTeamsBalanceScore(
+    groups
+  ) {
+
+    if (
+      groups.length === 0
+    ) {
+
+      return 0;
+
+    }
+
+
+    let score = 0;
+
+
+    groups.forEach(
+      group => {
+
+        score +=
+          waitingTeamInternalScore(
+            group.players
+          );
+
+      }
+    );
+
+
+    /*
+      Compare every waiting team
+      against every other waiting team.
+    */
+
+    for (
+      let i = 0;
+      i < groups.length;
+      i++
+    ) {
+
+      for (
+        let j = i + 1;
+        j < groups.length;
+        j++
+      ) {
+
+        const team1 =
+          groups[i].players;
+
+
+        const team2 =
+          groups[j].players;
+
+
+        /*
+          Skill balance between waiting teams.
+        */
+
+        score +=
+          Math.abs(
+            sumSkill(team1) -
+            sumSkill(team2)
+          ) * 35;
+
+
+        /*
+          Average age balance.
+        */
+
+        score +=
+          Math.abs(
+            averageAgeRank(team1) -
+            averageAgeRank(team2)
+          ) * 110;
+
+
+        /*
+          Actual category composition.
+        */
+
+        const counts1 =
+          categoryCounts(
+            team1
+          );
+
+
+        const counts2 =
+          categoryCounts(
+            team2
+          );
+
+
+        CATEGORY_ORDER.forEach(
+          category => {
+
+            let weight = 30;
+
+
+            if (
+              category === "Kids"
+            ) {
+
+              weight = 150;
+
+            }
+
+
+            else if (
+              category === "U14"
+            ) {
+
+              weight = 60;
+
+            }
+
+
+            else if (
+              category === "U18" ||
+              category === "18+"
+            ) {
+
+              weight = 70;
+
+            }
+
+
+            score +=
+              Math.abs(
+                counts1[category] -
+                counts2[category]
+              ) * weight;
+
+          }
+        );
+
+      }
+
+    }
+
+
+    return score;
+
+  }
+
+
+
+  function rebalanceWaitingGroups(
+    waitingGroups
+  ) {
+
+    if (
+      waitingGroups.length < 2
+    ) {
+
+      return waitingGroups;
+
+    }
+
+
+    const groups =
+      waitingGroups.map(
+        group => ({
+
+          ...group,
+
+          players:
+            [...group.players]
+
+        })
+      );
+
+
+    let currentScore =
+      waitingTeamsBalanceScore(
+        groups
+      );
+
+
+    /*
+      Repeatedly find the single best
+      one-for-one player swap between
+      waiting teams.
+    */
+
+    for (
+      let iteration = 0;
+      iteration < 20;
+      iteration++
+    ) {
+
+      let bestSwap = null;
+
+      let bestScore =
+        currentScore;
+
+
+      for (
+        let i = 0;
+        i < groups.length;
+        i++
+      ) {
+
+        for (
+          let j = i + 1;
+          j < groups.length;
+          j++
+        ) {
+
+          for (
+            let a = 0;
+            a < groups[i].players.length;
+            a++
+          ) {
+
+            for (
+              let b = 0;
+              b < groups[j].players.length;
+              b++
+            ) {
+
+              const candidate =
+                groups.map(
+                  group => ({
+
+                    ...group,
+
+                    players:
+                      [...group.players]
+
+                  })
+                );
+
+
+              const temp =
+                candidate[i]
+                  .players[a];
+
+
+              candidate[i]
+                .players[a] =
+                  candidate[j]
+                    .players[b];
+
+
+              candidate[j]
+                .players[b] =
+                  temp;
+
+
+              const score =
+                waitingTeamsBalanceScore(
+                  candidate
+                );
+
+
+              if (
+                score < bestScore
+              ) {
+
+                bestScore =
+                  score;
+
+
+                bestSwap = {
+
+                  i,
+
+                  j,
+
+                  a,
+
+                  b
+
+                };
+
+              }
+
+            }
+
+          }
+
+        }
+
+      }
+
+
+      if (
+        !bestSwap
+      ) {
+
+        break;
+
+      }
+
+
+      const temp =
+        groups[
+          bestSwap.i
+        ].players[
+          bestSwap.a
+        ];
+
+
+      groups[
+        bestSwap.i
+      ].players[
+        bestSwap.a
+      ] =
+        groups[
+          bestSwap.j
+        ].players[
+          bestSwap.b
+        ];
+
+
+      groups[
+        bestSwap.j
+      ].players[
+        bestSwap.b
+      ] =
+        temp;
+
+
+      currentScore =
+        bestScore;
+
+    }
+
+
+    /*
+      Refresh age information after
+      redistribution.
+    */
+
+    groups.forEach(
+      group => {
+
+        group.averageAge =
+          averageAgeRank(
+            group.players
+          );
+
+      }
+    );
+
+
+    return groups;
 
   }
 
@@ -1521,7 +1925,7 @@
 
     const gameGroups = [];
 
-    const waitingGroups = [];
+    let waitingGroups = [];
 
 
     let cursor = 0;
@@ -1627,6 +2031,25 @@
       }
 
     }
+
+
+    /*
+      NEW:
+      redistribute players between waiting
+      teams if a one-for-one swap improves
+      their balance.
+    */
+
+    waitingGroups =
+      rebalanceWaitingGroups(
+        waitingGroups
+      );
+
+
+    score +=
+      waitingTeamsBalanceScore(
+        waitingGroups
+      );
 
 
     return {
@@ -2120,7 +2543,6 @@
 
     let rotationPlayers = [];
 
-
     let remainingPlan = null;
 
 
@@ -2134,12 +2556,6 @@
         courts - 1
       );
 
-
-    /*
-      If another complete game can be
-      created and another court exists,
-      optimize the remainder independently.
-    */
 
     if (
       remainingCourts > 0 &&
@@ -2184,13 +2600,6 @@
 
 
     else {
-
-      /*
-        Not enough players / courts for
-        another complete game.
-
-        Those players start in rotation.
-      */
 
       rotationPlayers =
         [...remainingPlayers];
@@ -2311,8 +2720,8 @@
   ) {
 
     /*
-      The dedicated Kids 3v3 court is
-      an AUTO-mode feature.
+      Special Kids handling applies only
+      in Auto mode.
 
       Manual Force 3v3 / Force 4v4
       remains literal.
@@ -2354,11 +2763,6 @@
 
     }
 
-
-    /*
-      If the special rule cannot be used,
-      fall back to the normal optimizer.
-    */
 
     return generateStandardSession(
       selectedPlayers,
