@@ -26,7 +26,9 @@
 
   <div>
 
-    <h1>3x3 Team Maker</h1>
+    <h1>
+      3x3 Team Maker
+    </h1>
 
     <p>
       Balanced basketball teams
@@ -44,11 +46,15 @@
 <main>
 
 
-  <!-- SESSION SETUP -->
+  <!-- ==================================================
+       SESSION SETUP
+  =================================================== -->
 
   <section class="card">
 
-    <h2>Session setup</h2>
+    <h2>
+      Session setup
+    </h2>
 
 
     <div class="setting-row">
@@ -60,7 +66,10 @@
 
       <div class="counter">
 
-        <button id="courtMinus">
+        <button
+          id="courtMinus"
+          type="button"
+        >
           −
         </button>
 
@@ -68,7 +77,10 @@
           2
         </span>
 
-        <button id="courtPlus">
+        <button
+          id="courtPlus"
+          type="button"
+        >
           +
         </button>
 
@@ -106,7 +118,9 @@
 
 
 
-  <!-- PLAYER SELECTION -->
+  <!-- ==================================================
+       PLAYER SELECTION
+  =================================================== -->
 
   <section class="card">
 
@@ -114,7 +128,9 @@
 
       <div>
 
-        <h2>Players</h2>
+        <h2>
+          Players
+        </h2>
 
         <p id="playerSummary">
           Loading players...
@@ -126,6 +142,7 @@
       <button
         id="selectAll"
         class="secondary"
+        type="button"
       >
         Select all
       </button>
@@ -139,18 +156,23 @@
 
 
 
-  <!-- GENERATE -->
+  <!-- ==================================================
+       GENERATE BUTTON
+  =================================================== -->
 
   <button
     id="generateButton"
     class="generate"
+    type="button"
   >
     Create balanced teams
   </button>
 
 
 
-  <!-- RESULTS -->
+  <!-- ==================================================
+       RESULTS
+  =================================================== -->
 
   <section
     id="resultsSection"
@@ -158,29 +180,80 @@
     hidden
   >
 
+
+    <!-- RECOMMENDATION -->
+
     <div
       id="recommendation"
       class="card recommendation-card"
     ></div>
 
 
+
+    <!-- MANUAL ADJUSTMENTS -->
+
+    <section
+      id="manualAdjustmentCard"
+      class="card manual-card"
+    >
+
+      <div class="manual-header">
+
+        <div>
+
+          <h2>
+            Manual adjustments
+          </h2>
+
+          <p id="swapStatus">
+            Tap a player, then tap a player from another team to swap them.
+          </p>
+
+        </div>
+
+
+        <button
+          id="clearSwapButton"
+          class="secondary"
+          type="button"
+          disabled
+        >
+          Cancel
+        </button>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- COURTS -->
+
     <div id="courtResults"></div>
 
 
-    <div
+
+    <!-- WAITING TEAMS -->
+
+    <section
       id="waitingSection"
       class="card"
       hidden
     >
 
-      <h2>Next team</h2>
+      <h2 id="waitingTitle">
+        Next team
+      </h2>
 
       <div id="waitingTeams"></div>
 
-    </div>
+    </section>
 
 
-    <div
+
+    <!-- INDIVIDUAL ROTATION -->
+
+    <section
       id="rotationSection"
       class="card"
       hidden
@@ -197,7 +270,8 @@
 
       <div id="rotationPlayers"></div>
 
-    </div>
+    </section>
+
 
   </section>
 
