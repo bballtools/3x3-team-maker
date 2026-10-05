@@ -27,5 +27,6 @@
 
   { "id": "P022", "name": "Eli",    "category": "Kids", "skill": 3 },
   { "id": "P023", "name": "Kai",    "category": "Kids", "skill": 2 },
-  { "id": "P024", "name": "Liam",   "category": "Kids", "skill": 1 }
+  { "id": "P024", "name": "Liam",   "category": "Kids", "skill": 1 },
+  { "id": "P025", "name": "Milo",   "category": "U14", "skill": 3 }
 ]
