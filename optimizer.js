@@ -1,7 +1,7 @@
 (function () {
 
   // ==================================================
-  // AGE CONFIGURATION
+  // CONFIGURATION
   // ==================================================
 
   const CATEGORY_RANK = {
@@ -22,6 +22,24 @@
   ];
 
 
+  /*
+    History must influence the result, but it must
+    remain weaker than important skill/age rules.
+  */
+
+  const TEAMMATE_REPEAT_WEIGHT = 60;
+
+  const EXACT_TEAM_REPEAT_WEIGHT = 140;
+
+  const OPPONENT_REPEAT_WEIGHT = 6;
+
+  const EXACT_MATCHUP_REPEAT_WEIGHT = 80;
+
+
+
+  // ==================================================
+  // GENERAL UTILITIES
+  // ==================================================
 
   function categoryRank(category) {
 
@@ -30,10 +48,6 @@
   }
 
 
-
-  // ==================================================
-  // GENERAL UTILITIES
-  // ==================================================
 
   function shuffle(array) {
 
@@ -122,21 +136,23 @@
     );
 
 
-    players.forEach(player => {
+    players.forEach(
+      player => {
 
-      if (
-        counts[player.category] ===
-        undefined
-      ) {
+        if (
+          counts[player.category] ===
+          undefined
+        ) {
 
-        counts[player.category] = 0;
+          counts[player.category] = 0;
+
+        }
+
+
+        counts[player.category]++;
 
       }
-
-
-      counts[player.category]++;
-
-    });
+    );
 
 
     return counts;
@@ -165,6 +181,7 @@
         results.push(
           [...current]
         );
+
 
         return;
 
@@ -202,6 +219,449 @@
 
 
     return results;
+
+  }
+
+
+
+  // ==================================================
+  // EVENING HISTORY
+  // ==================================================
+
+  function incrementMap(
+    map,
+    key
+  ) {
+
+    map.set(
+      key,
+      (
+        map.get(key) || 0
+      ) + 1
+    );
+
+  }
+
+
+
+  function pairKey(
+    id1,
+    id2
+  ) {
+
+    return [
+      id1,
+      id2
+    ]
+      .sort()
+      .join("|");
+
+  }
+
+
+
+  function idsFromStoredTeam(
+    team
+  ) {
+
+    if (
+      Array.isArray(team)
+    ) {
+
+      return [...team];
+
+    }
+
+
+    if (
+      team &&
+      Array.isArray(
+        team.players
+      )
+    ) {
+
+      return team.players.map(
+        player =>
+          typeof player === "string"
+            ? player
+            : player.id
+      );
+
+    }
+
+
+    return [];
+
+  }
+
+
+
+  function teamKeyFromIds(ids) {
+
+    return [...ids]
+      .sort()
+      .join(",");
+
+  }
+
+
+
+  function teamKey(players) {
+
+    return teamKeyFromIds(
+      players.map(
+        player =>
+          player.id
+      )
+    );
+
+  }
+
+
+
+  function matchupKeyFromIds(
+    team1Ids,
+    team2Ids
+  ) {
+
+    return [
+      teamKeyFromIds(
+        team1Ids
+      ),
+      teamKeyFromIds(
+        team2Ids
+      )
+    ]
+      .sort()
+      .join(" VS ");
+
+  }
+
+
+
+  function buildHistoryStats(
+    approvedHistory
+  ) {
+
+    const stats = {
+
+      teammateCounts:
+        new Map(),
+
+      opponentCounts:
+        new Map(),
+
+      exactTeamCounts:
+        new Map(),
+
+      exactMatchupCounts:
+        new Map()
+
+    };
+
+
+    if (
+      !Array.isArray(
+        approvedHistory
+      )
+    ) {
+
+      return stats;
+
+    }
+
+
+    approvedHistory.forEach(
+      formation => {
+
+        const teams =
+          Array.isArray(
+            formation.teams
+          )
+            ? formation.teams
+            : [];
+
+
+        teams.forEach(
+          storedTeam => {
+
+            const ids =
+              idsFromStoredTeam(
+                storedTeam
+              );
+
+
+            if (
+              ids.length < 2
+            ) {
+
+              return;
+
+            }
+
+
+            incrementMap(
+              stats.exactTeamCounts,
+              teamKeyFromIds(
+                ids
+              )
+            );
+
+
+            for (
+              let i = 0;
+              i < ids.length;
+              i++
+            ) {
+
+              for (
+                let j = i + 1;
+                j < ids.length;
+                j++
+              ) {
+
+                incrementMap(
+
+                  stats.teammateCounts,
+
+                  pairKey(
+                    ids[i],
+                    ids[j]
+                  )
+
+                );
+
+              }
+
+            }
+
+          }
+        );
+
+
+        const matchups =
+          Array.isArray(
+            formation.matchups
+          )
+            ? formation.matchups
+            : [];
+
+
+        matchups.forEach(
+          matchup => {
+
+            const team1Ids =
+              idsFromStoredTeam(
+                matchup.team1
+              );
+
+
+            const team2Ids =
+              idsFromStoredTeam(
+                matchup.team2
+              );
+
+
+            if (
+              team1Ids.length === 0 ||
+              team2Ids.length === 0
+            ) {
+
+              return;
+
+            }
+
+
+            incrementMap(
+
+              stats.exactMatchupCounts,
+
+              matchupKeyFromIds(
+                team1Ids,
+                team2Ids
+              )
+
+            );
+
+
+            team1Ids.forEach(
+              id1 => {
+
+                team2Ids.forEach(
+                  id2 => {
+
+                    incrementMap(
+
+                      stats.opponentCounts,
+
+                      pairKey(
+                        id1,
+                        id2
+                      )
+
+                    );
+
+                  }
+                );
+
+              }
+            );
+
+          }
+        );
+
+      }
+    );
+
+
+    return stats;
+
+  }
+
+
+
+  function teamHistoryScore(
+    players,
+    historyStats
+  ) {
+
+    if (
+      !historyStats
+    ) {
+
+      return 0;
+
+    }
+
+
+    let score = 0;
+
+
+    for (
+      let i = 0;
+      i < players.length;
+      i++
+    ) {
+
+      for (
+        let j = i + 1;
+        j < players.length;
+        j++
+      ) {
+
+        const repeats =
+          historyStats
+            .teammateCounts
+            .get(
+              pairKey(
+                players[i].id,
+                players[j].id
+              )
+            ) || 0;
+
+
+        score +=
+          repeats *
+          TEAMMATE_REPEAT_WEIGHT;
+
+      }
+
+    }
+
+
+    const exactRepeats =
+      historyStats
+        .exactTeamCounts
+        .get(
+          teamKey(
+            players
+          )
+        ) || 0;
+
+
+    score +=
+      exactRepeats *
+      EXACT_TEAM_REPEAT_WEIGHT;
+
+
+    return score;
+
+  }
+
+
+
+  function matchupHistoryScore(
+    team1,
+    team2,
+    historyStats
+  ) {
+
+    if (
+      !historyStats
+    ) {
+
+      return 0;
+
+    }
+
+
+    let score = 0;
+
+
+    team1.forEach(
+      player1 => {
+
+        team2.forEach(
+          player2 => {
+
+            const repeats =
+              historyStats
+                .opponentCounts
+                .get(
+                  pairKey(
+                    player1.id,
+                    player2.id
+                  )
+                ) || 0;
+
+
+            score +=
+              repeats *
+              OPPONENT_REPEAT_WEIGHT;
+
+          }
+        );
+
+      }
+    );
+
+
+    const exactRepeats =
+      historyStats
+        .exactMatchupCounts
+        .get(
+          matchupKeyFromIds(
+
+            team1.map(
+              player =>
+                player.id
+            ),
+
+            team2.map(
+              player =>
+                player.id
+            )
+
+          )
+        ) || 0;
+
+
+    score +=
+      exactRepeats *
+      EXACT_MATCHUP_REPEAT_WEIGHT;
+
+
+    return score;
 
   }
 
@@ -263,42 +723,27 @@
 
 
     const unusedCourts =
-      courts -
-      playableCourts;
+      Math.max(
+        0,
+        courts -
+        playableCourts
+      );
 
 
     let score = 0;
 
 
-    /*
-      Loose individual players are
-      less desirable than complete teams.
-    */
-
     score +=
       individualRotation * 10;
 
-
-    /*
-      Complete waiting teams are
-      absolutely acceptable.
-    */
 
     score +=
       waitingTeams * 5;
 
 
-    /*
-      Prefer using available courts.
-    */
-
     score +=
       unusedCourts * 20;
 
-
-    /*
-      3v3 remains the main format.
-    */
 
     if (
       teamSize === 4
@@ -357,10 +802,6 @@
       );
 
 
-    // ==================================================
-    // FORCE 3V3
-    // ==================================================
-
     if (
       preference === "3"
     ) {
@@ -381,10 +822,6 @@
     }
 
 
-    // ==================================================
-    // FORCE 4V4
-    // ==================================================
-
     if (
       preference === "4"
     ) {
@@ -404,10 +841,6 @@
 
     }
 
-
-    // ==================================================
-    // AUTO
-    // ==================================================
 
     if (
       !plan3.valid &&
@@ -438,10 +871,6 @@
 
     }
 
-
-    /*
-      Equal result means 3v3 wins.
-    */
 
     return (
       plan3.score <=
@@ -495,11 +924,6 @@
         remaining
       );
 
-
-    /*
-      Avoid putting Kids into individual
-      rotation whenever possible.
-    */
 
     rotationPlayers.forEach(
       player => {
@@ -576,18 +1000,16 @@
       Infinity;
 
 
-    const attempts =
-      1500;
-
-
     for (
       let attempt = 0;
-      attempt < attempts;
+      attempt < 1500;
       attempt++
     ) {
 
       const candidate =
-        shuffle(players)
+        shuffle(
+          players
+        )
           .slice(
             0,
             rotationCount
@@ -646,7 +1068,8 @@
 
     const distance =
       Math.abs(
-        rank1 - rank2
+        rank1 -
+        rank2
       );
 
 
@@ -655,7 +1078,6 @@
         distance,
         2
       ) * 20;
-
 
 
     const player1Kids =
@@ -728,7 +1150,7 @@
 
 
   // ==================================================
-  // GAME-POOL AGE QUALITY
+  // GAME POOL AGE QUALITY
   // ==================================================
 
   function gamePoolAgeScore(
@@ -794,8 +1216,12 @@
 
 
     const spread =
-      Math.max(...ranks) -
-      Math.min(...ranks);
+      Math.max(
+        ...ranks
+      ) -
+      Math.min(
+        ...ranks
+      );
 
 
     score +=
@@ -896,8 +1322,12 @@
 
     score +=
       Math.abs(
-        averageAgeRank(team1) -
-        averageAgeRank(team2)
+        averageAgeRank(
+          team1
+        ) -
+        averageAgeRank(
+          team2
+        )
       ) * 80;
 
 
@@ -989,19 +1419,17 @@
 
   function splitGamePool(
     pool,
-    teamSize
+    teamSize,
+    historyStats
   ) {
 
     const playerCount =
       pool.length;
 
 
-    const expected =
-      teamSize * 2;
-
-
     if (
-      playerCount !== expected
+      playerCount !==
+      teamSize * 2
     ) {
 
       throw new Error(
@@ -1026,6 +1454,11 @@
       mask < totalMasks;
       mask++
     ) {
+
+      /*
+        Prevent checking the mirrored version
+        of the same team split twice.
+      */
 
       if (
         (mask & 1) === 0
@@ -1058,7 +1491,8 @@
       ) {
 
         if (
-          mask & (1 << i)
+          mask &
+          (1 << i)
         ) {
 
           team1.push(
@@ -1092,7 +1526,8 @@
 
       let score =
         Math.abs(
-          skill1 - skill2
+          skill1 -
+          skill2
         ) * 160;
 
 
@@ -1107,6 +1542,20 @@
         eliteDistributionScore(
           team1,
           team2
+        );
+
+
+      score +=
+        teamHistoryScore(
+          team1,
+          historyStats
+        );
+
+
+      score +=
+        teamHistoryScore(
+          team2,
+          historyStats
         );
 
 
@@ -1140,11 +1589,12 @@
 
 
   // ==================================================
-  // SPECIAL KIDS 3V3 COURT
+  // SPECIAL KIDS COURT
   // ==================================================
 
   function findSpecialKidsCourt(
-    players
+    players,
+    historyStats
   ) {
 
     const kids =
@@ -1154,11 +1604,6 @@
           "Kids"
       );
 
-
-    /*
-      2–5 Kids trigger the dedicated
-      3v3 Kids court.
-    */
 
     if (
       kids.length < 2 ||
@@ -1171,13 +1616,9 @@
 
 
     const fillersNeeded =
-      6 - kids.length;
+      6 -
+      kids.length;
 
-
-    /*
-      U14 first.
-      U16 only if needed.
-    */
 
     const eligibleFillers =
       players.filter(
@@ -1219,10 +1660,6 @@
         fillers.forEach(
           player => {
 
-            /*
-              Strongly prefer U14.
-            */
-
             if (
               player.category ===
               "U16"
@@ -1232,11 +1669,6 @@
 
             }
 
-
-            /*
-              Prefer lower-skilled players
-              when playing down.
-            */
 
             score +=
               player.skill * 20;
@@ -1272,12 +1704,21 @@
         const split =
           splitGamePool(
             pool,
-            3
+            3,
+            historyStats
           );
 
 
         score +=
           split.score;
+
+
+        score +=
+          matchupHistoryScore(
+            split.team1,
+            split.team2,
+            historyStats
+          );
 
 
         if (
@@ -1349,7 +1790,8 @@
             key:
               categoryRank(
                 player.category
-              ) + noise
+              ) +
+              noise
 
           };
 
@@ -1357,7 +1799,8 @@
       )
       .sort(
         (a, b) =>
-          a.key - b.key
+          a.key -
+          b.key
       )
       .map(
         item =>
@@ -1389,8 +1832,12 @@
 
 
     const spread =
-      Math.max(...ranks) -
-      Math.min(...ranks);
+      Math.max(
+        ...ranks
+      ) -
+      Math.min(
+        ...ranks
+      );
 
 
     score +=
@@ -1444,7 +1891,8 @@
 
 
   function waitingTeamsBalanceScore(
-    groups
+    groups,
+    historyStats
   ) {
 
     if (
@@ -1467,14 +1915,16 @@
             group.players
           );
 
+
+        score +=
+          teamHistoryScore(
+            group.players,
+            historyStats
+          );
+
       }
     );
 
-
-    /*
-      Compare every waiting team
-      against every other waiting team.
-    */
 
     for (
       let i = 0;
@@ -1496,31 +1946,27 @@
           groups[j].players;
 
 
-        /*
-          Skill balance between waiting teams.
-        */
-
         score +=
           Math.abs(
-            sumSkill(team1) -
-            sumSkill(team2)
+            sumSkill(
+              team1
+            ) -
+            sumSkill(
+              team2
+            )
           ) * 35;
 
 
-        /*
-          Average age balance.
-        */
-
         score +=
           Math.abs(
-            averageAgeRank(team1) -
-            averageAgeRank(team2)
+            averageAgeRank(
+              team1
+            ) -
+            averageAgeRank(
+              team2
+            )
           ) * 110;
 
-
-        /*
-          Actual category composition.
-        */
 
         const counts1 =
           categoryCounts(
@@ -1589,7 +2035,8 @@
 
 
   function rebalanceWaitingGroups(
-    waitingGroups
+    waitingGroups,
+    historyStats
   ) {
 
     if (
@@ -1616,15 +2063,10 @@
 
     let currentScore =
       waitingTeamsBalanceScore(
-        groups
+        groups,
+        historyStats
       );
 
-
-    /*
-      Repeatedly find the single best
-      one-for-one player swap between
-      waiting teams.
-    */
 
     for (
       let iteration = 0;
@@ -1693,7 +2135,8 @@
 
               const score =
                 waitingTeamsBalanceScore(
-                  candidate
+                  candidate,
+                  historyStats
                 );
 
 
@@ -1771,11 +2214,6 @@
     }
 
 
-    /*
-      Refresh age information after
-      redistribution.
-    */
-
     groups.forEach(
       group => {
 
@@ -1807,7 +2245,8 @@
 
     for (
       let court = 0;
-      court < plan.playableCourts;
+      court <
+      plan.playableCourts;
       court++
     ) {
 
@@ -1826,7 +2265,8 @@
 
     for (
       let waiting = 0;
-      waiting < plan.waitingTeams;
+      waiting <
+      plan.waitingTeams;
       waiting++
     ) {
 
@@ -1848,10 +2288,6 @@
   }
 
 
-
-  // ==================================================
-  // WAITING TEAM QUALITY
-  // ==================================================
 
   function waitingTeamScore(
     players
@@ -1882,12 +2318,13 @@
 
 
   // ==================================================
-  // CREATE CANDIDATE SESSION STRUCTURE
+  // CREATE CANDIDATE SESSION
   // ==================================================
 
   function createCandidateStructure(
     players,
-    plan
+    plan,
+    historyStats
   ) {
 
     let orderedPlayers;
@@ -1964,25 +2401,30 @@
         "game"
       ) {
 
-        const ageScore =
+        const split =
+          splitGamePool(
+            group,
+            plan.teamSize,
+            historyStats
+          );
+
+
+        score +=
           gamePoolAgeScore(
             group
           );
 
 
-        const split =
-          splitGamePool(
-            group,
-            plan.teamSize
-          );
-
-
-        score +=
-          ageScore;
-
-
         score +=
           split.score;
+
+
+        score +=
+          matchupHistoryScore(
+            split.team1,
+            split.team2,
+            historyStats
+          );
 
 
         gameGroups.push({
@@ -2004,14 +2446,7 @@
 
       }
 
-
       else {
-
-        score +=
-          waitingTeamScore(
-            group
-          );
-
 
         waitingGroups.push({
 
@@ -2033,22 +2468,29 @@
     }
 
 
-    /*
-      NEW:
-      redistribute players between waiting
-      teams if a one-for-one swap improves
-      their balance.
-    */
-
     waitingGroups =
       rebalanceWaitingGroups(
-        waitingGroups
+        waitingGroups,
+        historyStats
       );
+
+
+    waitingGroups.forEach(
+      group => {
+
+        score +=
+          waitingTeamScore(
+            group.players
+          );
+
+      }
+    );
 
 
     score +=
       waitingTeamsBalanceScore(
-        waitingGroups
+        waitingGroups,
+        historyStats
       );
 
 
@@ -2072,7 +2514,8 @@
 
   function createSessionStructure(
     players,
-    plan
+    plan,
+    historyStats
   ) {
 
     let best = null;
@@ -2094,7 +2537,8 @@
       const candidate =
         createCandidateStructure(
           players,
-          plan
+          plan,
+          historyStats
         );
 
 
@@ -2211,14 +2655,15 @@
 
 
   // ==================================================
-  // BUILD STANDARD PART OF SESSION
+  // BUILD STANDARD SESSION
   // ==================================================
 
   function buildStandardSession(
     players,
     plan,
     teamIndexStart,
-    courtOffset
+    courtOffset,
+    historyStats
   ) {
 
     const rotationPlayers =
@@ -2249,7 +2694,8 @@
     const structure =
       createSessionStructure(
         teamPlayers,
-        plan
+        plan,
+        historyStats
       );
 
 
@@ -2389,7 +2835,8 @@
   function generateStandardSession(
     selectedPlayers,
     courts,
-    formatPreference
+    formatPreference,
+    historyStats
   ) {
 
     const plan =
@@ -2405,7 +2852,8 @@
         selectedPlayers,
         plan,
         0,
-        0
+        0,
+        historyStats
       );
 
 
@@ -2450,12 +2898,14 @@
 
   function generateSpecialKidsSession(
     selectedPlayers,
-    courts
+    courts,
+    historyStats
   ) {
 
     const kidsCourt =
       findSpecialKidsCourt(
-        selectedPlayers
+        selectedPlayers,
+        historyStats
       );
 
 
@@ -2485,10 +2935,6 @@
           )
       );
 
-
-    // ------------------------------------------------
-    // KIDS COURT TEAMS
-    // ------------------------------------------------
 
     const teamA =
       createTeamObject(
@@ -2546,10 +2992,6 @@
     let remainingPlan = null;
 
 
-    // ------------------------------------------------
-    // REMAINING COURTS
-    // ------------------------------------------------
-
     const remainingCourts =
       Math.max(
         0,
@@ -2557,8 +2999,13 @@
       );
 
 
+    /*
+      Even when there are no more courts,
+      complete remaining teams are preferable
+      to treating everybody as loose rotation.
+    */
+
     if (
-      remainingCourts > 0 &&
       remainingPlayers.length >= 6
     ) {
 
@@ -2575,7 +3022,8 @@
           remainingPlayers,
           remainingPlan,
           2,
-          1
+          1,
+          historyStats
         );
 
 
@@ -2598,7 +3046,6 @@
 
     }
 
-
     else {
 
       rotationPlayers =
@@ -2606,10 +3053,6 @@
 
     }
 
-
-    // ------------------------------------------------
-    // SESSION SUMMARY
-    // ------------------------------------------------
 
     const remainingTeamCount =
       remainingPlan
@@ -2689,8 +3132,11 @@
           rotationPlayers.length,
 
         unusedCourts:
-          courts -
-          playableCourts
+          Math.max(
+            0,
+            courts -
+            playableCourts
+          )
 
       },
 
@@ -2716,16 +3162,15 @@
   function generate(
     selectedPlayers,
     courts,
-    formatPreference
+    formatPreference,
+    approvedHistory = []
   ) {
 
-    /*
-      Special Kids handling applies only
-      in Auto mode.
+    const historyStats =
+      buildHistoryStats(
+        approvedHistory
+      );
 
-      Manual Force 3v3 / Force 4v4
-      remains literal.
-    */
 
     if (
       formatPreference === "auto"
@@ -2747,7 +3192,8 @@
         const specialResult =
           generateSpecialKidsSession(
             selectedPlayers,
-            courts
+            courts,
+            historyStats
           );
 
 
@@ -2767,7 +3213,8 @@
     return generateStandardSession(
       selectedPlayers,
       courts,
-      formatPreference
+      formatPreference,
+      historyStats
     );
 
   }
