@@ -1,5 +1,5 @@
 // ==================================================
-// GLOBAL STATE
+// GLOBAL CONFIGURATION
 // ==================================================
 
 const CATEGORY_ORDER = [
@@ -14,6 +14,15 @@ const CATEGORY_ORDER = [
 const LOCAL_PLAYERS_KEY =
   "bballtools_3x3_local_players_v1";
 
+
+const EVENING_SESSION_KEY =
+  "bballtools_3x3_evening_session_v1";
+
+
+
+// ==================================================
+// GLOBAL STATE
+// ==================================================
 
 let masterPlayers = [];
 
@@ -42,21 +51,43 @@ let selectedSwapPlayer = null;
 let lastSwapMessage = "";
 
 
-
 /*
-  Alternative suggestion state.
-
-  Suggestion #1 is the initial generated result.
-  Every genuinely new arrangement increments
-  this number.
+  Approved formations are the ONLY formations
+  considered to have actually been used.
 */
 
+let approvedFormations = [];
+
+
+/*
+  Round numbering is separate from suggestion
+  numbering.
+
+  Round 1:
+    Suggestion #1
+    Suggestion #2
+    ...
+
+  Approve
+
+  Round 2:
+    Suggestion #1
+    ...
+*/
+
+let currentRoundNumber = 1;
+
 let suggestionNumber = 0;
+
+let currentRoundApproved = false;
 
 let seenSuggestionSignatures =
   new Set();
 
 let alternativesExhausted =
+  false;
+
+let currentRepeatNotice =
   false;
 
 
@@ -173,6 +204,36 @@ const alternativeButton =
   );
 
 
+const approveFormationButton =
+  document.getElementById(
+    "approveFormationButton"
+  );
+
+
+const remixButton =
+  document.getElementById(
+    "remixButton"
+  );
+
+
+const roundActionHelp =
+  document.getElementById(
+    "roundActionHelp"
+  );
+
+
+const eveningHistoryStatus =
+  document.getElementById(
+    "eveningHistoryStatus"
+  );
+
+
+const manualAdjustmentCard =
+  document.getElementById(
+    "manualAdjustmentCard"
+  );
+
+
 
 // ==================================================
 // HTML SAFETY
@@ -201,6 +262,243 @@ function escapeHtml(value) {
       "'",
       "&#039;"
     );
+
+}
+
+
+
+// ==================================================
+// LOCAL DATE
+// ==================================================
+
+function getTodayKey() {
+
+  const now =
+    new Date();
+
+
+  const year =
+    now.getFullYear();
+
+
+  const month =
+    String(
+      now.getMonth() + 1
+    )
+      .padStart(
+        2,
+        "0"
+      );
+
+
+  const day =
+    String(
+      now.getDate()
+    )
+      .padStart(
+        2,
+        "0"
+      );
+
+
+  return (
+    `${year}-${month}-${day}`
+  );
+
+}
+
+
+
+// ==================================================
+// EVENING SESSION HISTORY
+// ==================================================
+
+function loadEveningSession() {
+
+  approvedFormations = [];
+
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        EVENING_SESSION_KEY
+      );
+
+
+    if (
+      !raw
+    ) {
+
+      currentRoundNumber =
+        1;
+
+
+      renderEveningHistoryStatus();
+
+
+      return;
+
+    }
+
+
+    const stored =
+      JSON.parse(
+        raw
+      );
+
+
+    /*
+      History automatically starts fresh
+      on a new calendar day.
+    */
+
+    if (
+      !stored ||
+      stored.date !==
+        getTodayKey()
+    ) {
+
+      localStorage.removeItem(
+        EVENING_SESSION_KEY
+      );
+
+
+      currentRoundNumber =
+        1;
+
+
+      renderEveningHistoryStatus();
+
+
+      return;
+
+    }
+
+
+    if (
+      Array.isArray(
+        stored.approvedFormations
+      )
+    ) {
+
+      approvedFormations =
+        stored.approvedFormations
+          .filter(
+            formation =>
+              formation &&
+              formation.signature &&
+              Array.isArray(
+                formation.teams
+              )
+          );
+
+    }
+
+
+    currentRoundNumber =
+      approvedFormations.length +
+      1;
+
+
+    renderEveningHistoryStatus();
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Could not load evening history.",
+      error
+    );
+
+
+    approvedFormations = [];
+
+    currentRoundNumber =
+      1;
+
+
+    renderEveningHistoryStatus();
+
+  }
+
+}
+
+
+
+function saveEveningSession() {
+
+  const data = {
+
+    date:
+      getTodayKey(),
+
+    approvedFormations
+
+  };
+
+
+  localStorage.setItem(
+
+    EVENING_SESSION_KEY,
+
+    JSON.stringify(
+      data
+    )
+
+  );
+
+
+  renderEveningHistoryStatus();
+
+}
+
+
+
+function renderEveningHistoryStatus() {
+
+  if (
+    !eveningHistoryStatus
+  ) {
+
+    return;
+
+  }
+
+
+  const count =
+    approvedFormations.length;
+
+
+  if (
+    count === 0
+  ) {
+
+    eveningHistoryStatus.textContent =
+      "No approved rounds yet today.";
+
+
+    return;
+
+  }
+
+
+  if (
+    count === 1
+  ) {
+
+    eveningHistoryStatus.textContent =
+      "1 approved round remembered today.";
+
+
+    return;
+
+  }
+
+
+  eveningHistoryStatus.textContent =
+    `${count} approved rounds remembered today.`;
 
 }
 
@@ -353,10 +651,13 @@ function saveLocalPlayers() {
 
 
   localStorage.setItem(
+
     LOCAL_PLAYERS_KEY,
+
     JSON.stringify(
       cleanPlayers
     )
+
   );
 
 }
@@ -364,7 +665,7 @@ function saveLocalPlayers() {
 
 
 // ==================================================
-// CENTRAL + LOCAL ROSTER MERGE
+// CENTRAL + LOCAL ROSTER
 // ==================================================
 
 function mergePlayerSources() {
@@ -380,12 +681,6 @@ function mergePlayerSources() {
   const previousLocalCount =
     localPlayers.length;
 
-
-  /*
-    If a local newcomer has meanwhile
-    been added to players.json, remove
-    the temporary local copy.
-  */
 
   localPlayers =
     localPlayers.filter(
@@ -421,7 +716,7 @@ function mergePlayerSources() {
 
 
 // ==================================================
-// LOAD MASTER PLAYERS
+// LOAD PLAYERS
 // ==================================================
 
 async function loadPlayers() {
@@ -493,7 +788,7 @@ async function loadPlayers() {
 
 
 // ==================================================
-// ALPHABETICAL SORTING
+// ALPHABETICAL PLAYER SORTING
 // ==================================================
 
 function sortPlayersByName(
@@ -518,7 +813,7 @@ function sortPlayersByName(
 
 
 // ==================================================
-// FILTERED PLAYERS
+// VISIBLE PLAYERS
 // ==================================================
 
 function getVisiblePlayers() {
@@ -588,10 +883,13 @@ function renderCategoryTabs() {
               class="category-tab${activeClass}"
               data-category="${escapeHtml(category)}"
             >
+
               ${escapeHtml(category)}
+
               <span>
                 ${count}
               </span>
+
             </button>
 
           `;
@@ -650,19 +948,6 @@ categoryTabs
 
 function renderPlayers() {
 
-  /*
-    getVisiblePlayers() always returns
-    the players alphabetically sorted.
-
-    This applies to:
-    All
-    Kids
-    U14
-    U16
-    U18
-    18+
-  */
-
   const visiblePlayers =
     getVisiblePlayers();
 
@@ -684,9 +969,11 @@ function renderPlayers() {
             player.source ===
             "local"
               ? `
+
                 <span class="new-player-badge">
                   New
                 </span>
+
               `
               : "";
 
@@ -708,7 +995,9 @@ function renderPlayers() {
 
               `
               : `
+
                 <span class="player-action-placeholder"></span>
+
               `;
 
 
@@ -753,6 +1042,7 @@ function renderPlayers() {
                 class="skill"
                 for="${escapeHtml(checkboxId)}"
               >
+
                 ${
                   "★".repeat(
                     player.skill
@@ -762,6 +1052,7 @@ function renderPlayers() {
                     player.skill
                   )
                 }
+
               </label>
 
 
@@ -785,9 +1076,7 @@ function renderPlayers() {
     playerList.innerHTML = `
 
       <div class="empty-player-list">
-
         No players in this category yet.
-
       </div>
 
     `;
@@ -819,7 +1108,7 @@ function updatePlayerSummary() {
 
 
 // ==================================================
-// SELECT ALL / CLEAR VISIBLE
+// SELECT ALL
 // ==================================================
 
 function updateSelectAllButton() {
@@ -930,7 +1219,7 @@ document
 
 
 // ==================================================
-// ATTENDANCE CHANGES + DELETE
+// ATTENDANCE
 // ==================================================
 
 playerList
@@ -986,6 +1275,10 @@ playerList
 
 
 
+// ==================================================
+// DELETE LOCAL PLAYER
+// ==================================================
+
 playerList
   .addEventListener(
     "click",
@@ -1011,23 +1304,15 @@ playerList
       event.stopPropagation();
 
 
-      const playerId =
-        deleteButton.dataset
-          .deletePlayerId;
-
-
       deleteLocalPlayer(
-        playerId
+        deleteButton.dataset
+          .deletePlayerId
       );
 
     }
   );
 
 
-
-// ==================================================
-// DELETE LOCAL PLAYER
-// ==================================================
 
 function deleteLocalPlayer(
   playerId
@@ -1094,7 +1379,7 @@ function deleteLocalPlayer(
 
 
 // ==================================================
-// QUICK ADD FORM
+// QUICK ADD
 // ==================================================
 
 function updateQuickAddContext() {
@@ -1148,10 +1433,6 @@ function updateQuickAddContext() {
 
 
 
-// ==================================================
-// OPEN / CLOSE QUICK ADD
-// ==================================================
-
 addPlayerButton
   .addEventListener(
     "click",
@@ -1190,11 +1471,7 @@ document
   )
   .addEventListener(
     "click",
-    () => {
-
-      closeQuickAddForm();
-
-    }
+    closeQuickAddForm
   );
 
 
@@ -1288,7 +1565,7 @@ document
 
 
 // ==================================================
-// CREATE LOCAL PLAYER
+// ADD LOCAL PLAYER
 // ==================================================
 
 document
@@ -1481,10 +1758,6 @@ function renderNewcomerTools() {
 
 
 
-// ==================================================
-// COPY NEWCOMER LIST
-// ==================================================
-
 copyNewcomersButton
   .addEventListener(
     "click",
@@ -1610,10 +1883,6 @@ copyNewcomersButton
 
 function showCopiedState() {
 
-  const original =
-    "Copy newcomer list";
-
-
   copyNewcomersButton.textContent =
     "Copied ✓";
 
@@ -1622,7 +1891,7 @@ function showCopiedState() {
     () => {
 
       copyNewcomersButton.textContent =
-        original;
+        "Copy newcomer list";
 
     },
     1600
@@ -1633,7 +1902,7 @@ function showCopiedState() {
 
 
 // ==================================================
-// RENDER COMPLETE PLAYER INTERFACE
+// PLAYER INTERFACE
 // ==================================================
 
 function renderPlayerInterface() {
@@ -1653,7 +1922,7 @@ function renderPlayerInterface() {
 
 
 // ==================================================
-// COURTS
+// COURTS / FORMAT
 // ==================================================
 
 document
@@ -1735,66 +2004,15 @@ function resetAlternativeHistory() {
     false;
 
 
-  updateAlternativeButton();
-
-}
-
-
-
-function updateAlternativeButton() {
-
-  if (
-    !alternativeButton
-  ) {
-
-    return;
-
-  }
-
-
-  if (
-    alternativesExhausted
-  ) {
-
-    alternativeButton.disabled =
-      true;
-
-
-    alternativeButton.textContent =
-      "✓ No more alternatives";
-
-
-    return;
-
-  }
-
-
-  alternativeButton.disabled =
+  currentRepeatNotice =
     false;
-
-
-  if (
-    suggestionNumber > 0
-  ) {
-
-    alternativeButton.textContent =
-      `🔀 Find alternative #${suggestionNumber + 1}`;
-
-  }
-
-  else {
-
-    alternativeButton.textContent =
-      "🔀 Alternative teams";
-
-  }
 
 }
 
 
 
 // ==================================================
-// INVALIDATE OLD RESULT
+// INVALIDATE CURRENT RESULT
 // ==================================================
 
 function invalidateResults() {
@@ -1809,6 +2027,15 @@ function invalidateResults() {
 
   lastSwapMessage =
     "";
+
+
+  currentRoundApproved =
+    false;
+
+
+  currentRoundNumber =
+    approvedFormations.length +
+    1;
 
 
   resetAlternativeHistory();
@@ -1852,13 +2079,20 @@ function playerRow(
       player.id;
 
 
+  const disabled =
+    currentRoundApproved
+      ? "disabled"
+      : "";
+
+
   return `
 
     <button
       type="button"
-      class="result-player swap-player${selected ? " selected-swap-player" : ""}"
+      class="result-player swap-player${selected ? " selected-swap-player" : ""}${currentRoundApproved ? " locked-player" : ""}"
       data-team-id="${escapeHtml(teamId)}"
       data-player-id="${escapeHtml(player.id)}"
+      ${disabled}
     >
 
       <span class="result-player-left">
@@ -1962,7 +2196,7 @@ function rotationPlayerRow(
 
 
 // ==================================================
-// RECALCULATE TEAM AFTER SWAP
+// RECALCULATE TEAM
 // ==================================================
 
 function recalculateTeam(
@@ -2016,10 +2250,173 @@ function findTeam(
 
 
 // ==================================================
+// FORMATION SIGNATURE
+// ==================================================
+
+function resultSignature(
+  result
+) {
+
+  /*
+    "Formation" means team composition.
+
+    Changing:
+    - court number
+    - Team A / Team B order
+    - which side of VS
+
+    does NOT create a new formation.
+  */
+
+  const teams =
+    result.teams
+      .map(
+        team =>
+          team.players
+            .map(
+              player =>
+                player.id
+            )
+            .sort()
+            .join(",")
+      )
+      .sort();
+
+
+  const rotation =
+    result.rotationPlayers
+      .map(
+        player =>
+          player.id
+      )
+      .sort();
+
+
+  return JSON.stringify({
+
+    format:
+      result.plan.formatLabel,
+
+    teams,
+
+    rotation
+
+  });
+
+}
+
+
+
+// ==================================================
+// APPROVED SIGNATURES
+// ==================================================
+
+function approvedSignatureSet() {
+
+  return new Set(
+    approvedFormations.map(
+      formation =>
+        formation.signature
+    )
+  );
+
+}
+
+
+
+// ==================================================
+// CREATE STORED FORMATION
+// ==================================================
+
+function createStoredFormation(
+  result
+) {
+
+  return {
+
+    round:
+      currentRoundNumber,
+
+    approvedAt:
+      new Date()
+        .toISOString(),
+
+    signature:
+      resultSignature(
+        result
+      ),
+
+    format:
+      result.plan.formatLabel,
+
+    teams:
+      result.teams.map(
+        team =>
+          team.players.map(
+            player =>
+              player.id
+          )
+      ),
+
+    matchups:
+      result.courtGames.map(
+        game => ({
+
+          team1:
+            game.team1.players.map(
+              player =>
+                player.id
+            ),
+
+          team2:
+            game.team2.players.map(
+              player =>
+                player.id
+            )
+
+        })
+      ),
+
+    rotation:
+      result.rotationPlayers.map(
+        player =>
+          player.id
+      )
+
+  };
+
+}
+
+
+
+// ==================================================
 // SWAP STATUS
 // ==================================================
 
 function updateSwapStatus() {
+
+  manualAdjustmentCard.classList.toggle(
+    "approved",
+    currentRoundApproved
+  );
+
+
+  if (
+    currentRoundApproved
+  ) {
+
+    swapStatus.textContent =
+      `Round ${currentRoundNumber} is approved. The formation is locked until the next remix.`;
+
+
+    clearSwapButton.disabled =
+      true;
+
+
+    return;
+
+  }
+
 
   if (
     lastSwapMessage
@@ -2134,6 +2531,15 @@ function handlePlayerSwapClick(
   playerId
 ) {
 
+  if (
+    currentRoundApproved
+  ) {
+
+    return;
+
+  }
+
+
   const team =
     findTeam(
       teamId
@@ -2166,10 +2572,6 @@ function handlePlayerSwapClick(
   }
 
 
-  // ------------------------------------------------
-  // FIRST PLAYER
-  // ------------------------------------------------
-
   if (
     !selectedSwapPlayer
   ) {
@@ -2198,10 +2600,6 @@ function handlePlayerSwapClick(
   }
 
 
-  // ------------------------------------------------
-  // SAME PLAYER = CANCEL
-  // ------------------------------------------------
-
   if (
     selectedSwapPlayer.teamId ===
       teamId &&
@@ -2227,11 +2625,6 @@ function handlePlayerSwapClick(
 
   }
 
-
-  // ------------------------------------------------
-  // ANOTHER PLAYER IN SAME TEAM
-  // = CHANGE SELECTION
-  // ------------------------------------------------
 
   if (
     selectedSwapPlayer.teamId ===
@@ -2261,10 +2654,6 @@ function handlePlayerSwapClick(
 
   }
 
-
-  // ------------------------------------------------
-  // SECOND PLAYER FROM ANOTHER TEAM
-  // ------------------------------------------------
 
   const firstTeam =
     findTeam(
@@ -2355,12 +2744,8 @@ function handlePlayerSwapClick(
 
 
   /*
-    Remember a manually-created arrangement
-    as already seen.
-
-    This avoids presenting the exact same
-    arrangement later as a supposedly new
-    automatic alternative.
+    Remember the manually adjusted result as one
+    of the suggestions already seen this round.
   */
 
   seenSuggestionSignatures.add(
@@ -2380,7 +2765,7 @@ function handlePlayerSwapClick(
 
 
 // ==================================================
-// RESULT PLAYER CLICK HANDLER
+// RESULT CLICK
 // ==================================================
 
 resultsSection
@@ -2417,128 +2802,12 @@ resultsSection
 
 
 // ==================================================
-// RESULT SIGNATURE
-// ==================================================
-
-function resultSignature(
-  result
-) {
-
-  /*
-    A signature describes the actual
-    meaningful player arrangement.
-
-    Team names do NOT matter.
-    Court numbering does NOT matter.
-    Team A vs Team B side does NOT matter.
-
-    Therefore simply flipping two teams
-    or moving the same matchup to another
-    court is not treated as a new alternative.
-  */
-
-  const courtsSignature =
-    result.courtGames
-      .map(
-        game => {
-
-          const team1 =
-            game.team1.players
-              .map(
-                player =>
-                  player.id
-              )
-              .sort()
-              .join(",");
-
-
-          const team2 =
-            game.team2.players
-              .map(
-                player =>
-                  player.id
-              )
-              .sort()
-              .join(",");
-
-
-          return [
-            team1,
-            team2
-          ]
-            .sort()
-            .join(" VS ");
-
-        }
-      )
-      .sort();
-
-
-  const waitingSignature =
-    result.waitingTeams
-      .map(
-        team =>
-          team.players
-            .map(
-              player =>
-                player.id
-            )
-            .sort()
-            .join(",")
-      )
-      .sort();
-
-
-  const rotationSignature =
-    result.rotationPlayers
-      .map(
-        player =>
-          player.id
-      )
-      .sort();
-
-
-  return JSON.stringify({
-
-    format:
-      result.plan.formatLabel,
-
-    courts:
-      courtsSignature,
-
-    waiting:
-      waitingSignature,
-
-    rotation:
-      rotationSignature
-
-  });
-
-}
-
-
-
-// ==================================================
-// ALTERNATIVE SEARCH DEPTH
+// SEARCH DEPTH FOR ALTERNATIVES
 // ==================================================
 
 function alternativeSearchAttemptLimit(
   selectedPlayers
 ) {
-
-  /*
-    Larger and more diverse groups can have
-    more legitimate balanced alternatives.
-
-    The search budget therefore considers:
-    - number of participants
-    - number of different age/skill profiles
-
-    The actual decision that alternatives
-    are exhausted is still based on whether
-    the optimizer keeps returning arrangements
-    that the leader has already seen.
-  */
 
   const profileCount =
     new Set(
@@ -2550,17 +2819,19 @@ function alternativeSearchAttemptLimit(
 
 
   const calculated =
-    8 +
+    6 +
     Math.floor(
-      selectedPlayers.length / 2
+      selectedPlayers.length / 4
     ) +
-    profileCount;
+    Math.floor(
+      profileCount / 2
+    );
 
 
   return Math.max(
-    12,
+    8,
     Math.min(
-      28,
+      14,
       calculated
     )
   );
@@ -2570,7 +2841,7 @@ function alternativeSearchAttemptLimit(
 
 
 // ==================================================
-// CURRENT PRESENT PLAYERS
+// PRESENT PLAYERS
 // ==================================================
 
 function getPresentPlayers() {
@@ -2587,7 +2858,7 @@ function getPresentPlayers() {
 
 
 // ==================================================
-// SMALL UI YIELD
+// BROWSER PAINT
 // ==================================================
 
 function allowBrowserToPaint() {
@@ -2605,7 +2876,125 @@ function allowBrowserToPaint() {
 
 
 // ==================================================
-// GENERATE RESULT
+// GENERATE INITIAL ROUND SUGGESTION
+// ==================================================
+
+async function generateInitialSuggestion(
+  selectedPlayers,
+  formatPreference
+) {
+
+  const previousSignatures =
+    approvedSignatureSet();
+
+
+  const attemptLimit =
+    alternativeSearchAttemptLimit(
+      selectedPlayers
+    );
+
+
+  let firstCandidate =
+    null;
+
+
+  let selectedCandidate =
+    null;
+
+
+  /*
+    Try to start the new round with a formation
+    that has not previously been approved today.
+  */
+
+  for (
+    let attempt = 0;
+    attempt < attemptLimit;
+    attempt++
+  ) {
+
+    const candidate =
+      TeamOptimizer.generate(
+        selectedPlayers,
+        courts,
+        formatPreference,
+        approvedFormations
+      );
+
+
+    if (
+      !firstCandidate
+    ) {
+
+      firstCandidate =
+        candidate;
+
+    }
+
+
+    const signature =
+      resultSignature(
+        candidate
+      );
+
+
+    if (
+      !previousSignatures.has(
+        signature
+      )
+    ) {
+
+      selectedCandidate =
+        candidate;
+
+
+      break;
+
+    }
+
+
+    if (
+      (attempt + 1) % 4 === 0
+    ) {
+
+      await allowBrowserToPaint();
+
+    }
+
+  }
+
+
+  if (
+    selectedCandidate
+  ) {
+
+    currentRepeatNotice =
+      false;
+
+
+    return selectedCandidate;
+
+  }
+
+
+  /*
+    If every high-quality result we found has
+    already been used, repetition is probably
+    unavoidable for this participant mix.
+  */
+
+  currentRepeatNotice =
+    approvedFormations.length > 0;
+
+
+  return firstCandidate;
+
+}
+
+
+
+// ==================================================
+// GENERATE TEAMS
 // ==================================================
 
 async function generateTeams(
@@ -2649,22 +3038,41 @@ async function generateTeams(
 
 
     // ==================================================
-    // FIRST SUGGESTION
+    // FIRST SUGGESTION OF ROUND
     // ==================================================
 
     if (
       !alternative
     ) {
 
+      currentRoundNumber =
+        approvedFormations.length +
+        1;
+
+
+      currentRoundApproved =
+        false;
+
+
       resetAlternativeHistory();
 
 
       const result =
-        TeamOptimizer.generate(
+        await generateInitialSuggestion(
           selectedPlayers,
-          courts,
           formatPreference
         );
+
+
+      if (
+        !result
+      ) {
+
+        throw new Error(
+          "Could not generate teams."
+        );
+
+      }
 
 
       suggestionNumber =
@@ -2683,6 +3091,24 @@ async function generateTeams(
       );
 
 
+      if (
+        currentRepeatNotice
+      ) {
+
+        setTimeout(
+          () => {
+
+            alert(
+              "A completely unused formation could not be found for this round. Some repetition from earlier rounds may be unavoidable with the current participants."
+            );
+
+          },
+          100
+        );
+
+      }
+
+
       return;
 
     }
@@ -2690,17 +3116,13 @@ async function generateTeams(
 
 
     // ==================================================
-    // ALTERNATIVE SUGGESTION
+    // ALTERNATIVE INSIDE CURRENT ROUND
     // ==================================================
 
     if (
-      !currentResult
+      !currentResult ||
+      currentRoundApproved
     ) {
-
-      await generateTeams(
-        false
-      );
-
 
       return;
 
@@ -2712,7 +3134,7 @@ async function generateTeams(
     ) {
 
       alert(
-        "No more meaningful alternatives could be found for the current players and settings."
+        "No more meaningful unused alternatives could be found for the current players and settings."
       );
 
 
@@ -2729,12 +3151,6 @@ async function generateTeams(
       "Searching…";
 
 
-    /*
-      Give the browser a chance to display
-      the searching state before the
-      optimizer starts doing work.
-    */
-
     await allowBrowserToPaint();
 
 
@@ -2742,6 +3158,10 @@ async function generateTeams(
       alternativeSearchAttemptLimit(
         selectedPlayers
       );
+
+
+    const previousApproved =
+      approvedSignatureSet();
 
 
     let foundResult =
@@ -2762,7 +3182,8 @@ async function generateTeams(
         TeamOptimizer.generate(
           selectedPlayers,
           courts,
-          formatPreference
+          formatPreference,
+          approvedFormations
         );
 
 
@@ -2774,6 +3195,9 @@ async function generateTeams(
 
       if (
         !seenSuggestionSignatures.has(
+          signature
+        ) &&
+        !previousApproved.has(
           signature
         )
       ) {
@@ -2791,12 +3215,6 @@ async function generateTeams(
       }
 
 
-      /*
-        Occasionally yield control so that
-        the mobile browser remains responsive
-        during a longer alternative search.
-      */
-
       if (
         (attempt + 1) % 4 === 0
       ) {
@@ -2807,11 +3225,6 @@ async function generateTeams(
 
     }
 
-
-
-    // ==================================================
-    // NEW ALTERNATIVE FOUND
-    // ==================================================
 
     if (
       foundResult
@@ -2825,6 +3238,10 @@ async function generateTeams(
       );
 
 
+      currentRepeatNotice =
+        false;
+
+
       renderResult(
         foundResult
       );
@@ -2835,27 +3252,22 @@ async function generateTeams(
     }
 
 
-
-    // ==================================================
-    // NO FURTHER MEANINGFUL ALTERNATIVE FOUND
-    // ==================================================
-
     alternativesExhausted =
       true;
 
 
-    updateAlternativeButton();
+    updateRoundControls();
 
 
     alert(
-      "No more meaningful alternatives could be found for this group with the current courts and game format.\n\nThe available balanced variations are limited by the number of players, their age categories and their skill levels."
+      "No more meaningful unused alternatives could be found for this round.\n\nThe available balanced variations are limited by the number of participants, their age categories and skill levels."
     );
 
   }
 
   catch (error) {
 
-    updateAlternativeButton();
+    updateRoundControls();
 
 
     alert(
@@ -2874,7 +3286,108 @@ async function generateTeams(
 
 
 // ==================================================
-// CREATE BALANCED TEAMS BUTTON
+// APPROVE FORMATION
+// ==================================================
+
+function approveCurrentFormation() {
+
+  if (
+    !currentResult ||
+    currentRoundApproved
+  ) {
+
+    return;
+
+  }
+
+
+  const confirmed =
+    window.confirm(
+      `Use this formation for Round ${currentRoundNumber}?`
+    );
+
+
+  if (
+    !confirmed
+  ) {
+
+    return;
+
+  }
+
+
+  const stored =
+    createStoredFormation(
+      currentResult
+    );
+
+
+  approvedFormations.push(
+    stored
+  );
+
+
+  saveEveningSession();
+
+
+  currentRoundApproved =
+    true;
+
+
+  selectedSwapPlayer =
+    null;
+
+
+  lastSwapMessage =
+    "";
+
+
+  renderResult(
+    currentResult,
+    false
+  );
+
+}
+
+
+
+// ==================================================
+// RESET / REMIX NEXT ROUND
+// ==================================================
+
+async function remixForNextRound() {
+
+  if (
+    !currentRoundApproved
+  ) {
+
+    return;
+
+  }
+
+
+  currentRoundNumber =
+    approvedFormations.length +
+    1;
+
+
+  currentRoundApproved =
+    false;
+
+
+  resetAlternativeHistory();
+
+
+  await generateTeams(
+    false
+  );
+
+}
+
+
+
+// ==================================================
+// ROUND BUTTONS
 // ==================================================
 
 document
@@ -2894,10 +3407,6 @@ document
 
 
 
-// ==================================================
-// ALTERNATIVE BUTTON
-// ==================================================
-
 alternativeButton
   .addEventListener(
     "click",
@@ -2909,6 +3418,114 @@ alternativeButton
 
     }
   );
+
+
+
+approveFormationButton
+  .addEventListener(
+    "click",
+    approveCurrentFormation
+  );
+
+
+
+remixButton
+  .addEventListener(
+    "click",
+    remixForNextRound
+  );
+
+
+
+// ==================================================
+// ROUND CONTROL UI
+// ==================================================
+
+function updateRoundControls() {
+
+  if (
+    !currentResult
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    currentRoundApproved
+  ) {
+
+    alternativeButton.disabled =
+      true;
+
+
+    alternativeButton.textContent =
+      "🔀 Alternative teams";
+
+
+    approveFormationButton.disabled =
+      true;
+
+
+    approveFormationButton.textContent =
+      "✓ Formation approved";
+
+
+    remixButton.hidden =
+      false;
+
+
+    roundActionHelp.textContent =
+      `Round ${currentRoundNumber} is recorded as used. After the games, reset and remix for the next round.`;
+
+
+    return;
+
+  }
+
+
+  remixButton.hidden =
+    true;
+
+
+  approveFormationButton.disabled =
+    false;
+
+
+  approveFormationButton.textContent =
+    "✅ Use this formation";
+
+
+  if (
+    alternativesExhausted
+  ) {
+
+    alternativeButton.disabled =
+      true;
+
+
+    alternativeButton.textContent =
+      "✓ No more alternatives";
+
+  }
+
+  else {
+
+    alternativeButton.disabled =
+      false;
+
+
+    alternativeButton.textContent =
+      `🔀 Find alternative #${suggestionNumber + 1}`;
+
+  }
+
+
+  roundActionHelp.textContent =
+    "Review the teams, make any swaps, then approve the formation that will actually be used.";
+
+}
 
 
 
@@ -2960,6 +3577,41 @@ function renderResult(
   }
 
 
+  let historyNote =
+    "";
+
+
+  if (
+    currentRepeatNotice
+  ) {
+
+    historyNote = `
+
+      <div class="history-warning">
+
+        Some repetition from earlier approved rounds may be unavoidable.
+
+      </div>
+
+    `;
+
+  }
+
+
+  const approvedNote =
+    currentRoundApproved
+      ? `
+
+        <div class="approved-formation-note">
+
+          ✓ This is the formation recorded as used for Round ${currentRoundNumber}.
+
+        </div>
+
+      `
+      : "";
+
+
   document
     .getElementById(
       "recommendation"
@@ -2978,8 +3630,10 @@ function renderResult(
         </div>
 
 
-        <div class="suggestion-badge">
+        <div class="round-suggestion-badge">
 
+          Round ${currentRoundNumber}
+          ·
           Suggestion #${suggestionNumber}
 
         </div>
@@ -3043,6 +3697,10 @@ function renderResult(
       </div>
 
       ${specialNote}
+
+      ${historyNote}
+
+      ${approvedNote}
 
     `;
 
@@ -3221,7 +3879,9 @@ function renderResult(
 
   updateSwapStatus();
 
-  updateAlternativeButton();
+  updateRoundControls();
+
+  renderEveningHistoryStatus();
 
 
   if (
@@ -3247,5 +3907,7 @@ function renderResult(
 // ==================================================
 // START APPLICATION
 // ==================================================
+
+loadEveningSession();
 
 loadPlayers();
