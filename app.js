@@ -1,6 +1,39 @@
+// ==================================================
+// GLOBAL STATE
+// ==================================================
+
+const CATEGORY_ORDER = [
+  "Kids",
+  "U14",
+  "U16",
+  "U18",
+  "18+"
+];
+
+
+const LOCAL_PLAYERS_KEY =
+  "bballtools_3x3_local_players_v1";
+
+
+let masterPlayers = [];
+
+let localPlayers = [];
+
 let players = [];
 
+
 let courts = 2;
+
+let activeCategory =
+  "All";
+
+
+let presentPlayerIds =
+  new Set();
+
+
+let quickAddSkill = 3;
+
 
 let currentResult = null;
 
@@ -9,6 +42,10 @@ let selectedSwapPlayer = null;
 let lastSwapMessage = "";
 
 
+
+// ==================================================
+// ELEMENTS
+// ==================================================
 
 const playerList =
   document.getElementById(
@@ -34,6 +71,72 @@ const resultsSection =
   );
 
 
+const categoryTabs =
+  document.getElementById(
+    "categoryTabs"
+  );
+
+
+const addPlayerButton =
+  document.getElementById(
+    "addPlayerButton"
+  );
+
+
+const quickAddForm =
+  document.getElementById(
+    "quickAddForm"
+  );
+
+
+const quickAddTitle =
+  document.getElementById(
+    "quickAddTitle"
+  );
+
+
+const quickAddDescription =
+  document.getElementById(
+    "quickAddDescription"
+  );
+
+
+const quickAddCategoryRow =
+  document.getElementById(
+    "quickAddCategoryRow"
+  );
+
+
+const newPlayerName =
+  document.getElementById(
+    "newPlayerName"
+  );
+
+
+const newPlayerCategory =
+  document.getElementById(
+    "newPlayerCategory"
+  );
+
+
+const newcomerTools =
+  document.getElementById(
+    "newcomerTools"
+  );
+
+
+const newcomerCount =
+  document.getElementById(
+    "newcomerCount"
+  );
+
+
+const copyNewcomersButton =
+  document.getElementById(
+    "copyNewcomers"
+  );
+
+
 const swapStatus =
   document.getElementById(
     "swapStatus"
@@ -48,7 +151,253 @@ const clearSwapButton =
 
 
 // ==================================================
-// LOAD PLAYERS
+// HTML SAFETY
+// ==================================================
+
+function escapeHtml(value) {
+
+  return String(value)
+    .replaceAll(
+      "&",
+      "&amp;"
+    )
+    .replaceAll(
+      "<",
+      "&lt;"
+    )
+    .replaceAll(
+      ">",
+      "&gt;"
+    )
+    .replaceAll(
+      "\"",
+      "&quot;"
+    )
+    .replaceAll(
+      "'",
+      "&#039;"
+    );
+
+}
+
+
+
+// ==================================================
+// PLAYER NORMALIZATION
+// ==================================================
+
+function normalizeName(name) {
+
+  return String(name)
+    .trim()
+    .toLocaleLowerCase()
+    .replace(
+      /\s+/g,
+      " "
+    );
+
+}
+
+
+
+function rosterKey(player) {
+
+  return (
+    normalizeName(
+      player.name
+    ) +
+    "|" +
+    player.category
+  );
+
+}
+
+
+
+// ==================================================
+// LOCAL PLAYER STORAGE
+// ==================================================
+
+function loadLocalPlayers() {
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        LOCAL_PLAYERS_KEY
+      );
+
+
+    if (
+      !raw
+    ) {
+
+      return [];
+
+    }
+
+
+    const parsed =
+      JSON.parse(
+        raw
+      );
+
+
+    if (
+      !Array.isArray(parsed)
+    ) {
+
+      return [];
+
+    }
+
+
+    return parsed
+      .filter(
+        player =>
+          player &&
+          player.id &&
+          player.name &&
+          CATEGORY_ORDER.includes(
+            player.category
+          ) &&
+          Number.isInteger(
+            player.skill
+          ) &&
+          player.skill >= 1 &&
+          player.skill <= 5
+      )
+      .map(
+        player => ({
+
+          id:
+            player.id,
+
+          name:
+            player.name,
+
+          category:
+            player.category,
+
+          skill:
+            player.skill,
+
+          source:
+            "local"
+
+        })
+      );
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Could not load local players.",
+      error
+    );
+
+
+    return [];
+
+  }
+
+}
+
+
+
+function saveLocalPlayers() {
+
+  const cleanPlayers =
+    localPlayers.map(
+      player => ({
+
+        id:
+          player.id,
+
+        name:
+          player.name,
+
+        category:
+          player.category,
+
+        skill:
+          player.skill
+
+      })
+    );
+
+
+  localStorage.setItem(
+    LOCAL_PLAYERS_KEY,
+    JSON.stringify(
+      cleanPlayers
+    )
+  );
+
+}
+
+
+
+// ==================================================
+// CENTRAL + LOCAL ROSTER MERGE
+// ==================================================
+
+function mergePlayerSources() {
+
+  const masterKeys =
+    new Set(
+      masterPlayers.map(
+        rosterKey
+      )
+    );
+
+
+  const previousLocalCount =
+    localPlayers.length;
+
+
+  /*
+    If Igor has meanwhile added a local
+    newcomer to players.json, remove the
+    temporary local copy automatically.
+  */
+
+  localPlayers =
+    localPlayers.filter(
+      player =>
+        !masterKeys.has(
+          rosterKey(
+            player
+          )
+        )
+    );
+
+
+  if (
+    localPlayers.length !==
+    previousLocalCount
+  ) {
+
+    saveLocalPlayers();
+
+  }
+
+
+  players = [
+
+    ...masterPlayers,
+
+    ...localPlayers
+
+  ];
+
+}
+
+
+
+// ==================================================
+// LOAD MASTER PLAYERS
 // ==================================================
 
 async function loadPlayers() {
@@ -75,11 +424,31 @@ async function loadPlayers() {
     }
 
 
-    players =
+    const loaded =
       await response.json();
 
 
-    renderPlayers();
+    masterPlayers =
+      loaded.map(
+        player => ({
+
+          ...player,
+
+          source:
+            "master"
+
+        })
+      );
+
+
+    localPlayers =
+      loadLocalPlayers();
+
+
+    mergePlayerSources();
+
+
+    renderPlayerInterface();
 
   }
 
@@ -100,108 +469,372 @@ async function loadPlayers() {
 
 
 // ==================================================
-// RENDER PLAYER LIST
+// SORTING
 // ==================================================
 
-function renderPlayers() {
+function sortPlayersByName(
+  list
+) {
 
-  playerList.innerHTML =
-    "";
+  return [...list]
+    .sort(
+      (a, b) =>
+        a.name.localeCompare(
+          b.name,
+          undefined,
+          {
+            sensitivity:
+              "base"
+          }
+        )
+    );
+
+}
 
 
-  players.forEach(
-    player => {
 
-      const row =
-        document.createElement(
-          "label"
+// ==================================================
+// FILTERED PLAYERS
+// ==================================================
+
+function getVisiblePlayers() {
+
+  if (
+    activeCategory ===
+    "All"
+  ) {
+
+    return sortPlayersByName(
+      players
+    );
+
+  }
+
+
+  return sortPlayersByName(
+    players.filter(
+      player =>
+        player.category ===
+        activeCategory
+    )
+  );
+
+}
+
+
+
+// ==================================================
+// CATEGORY TABS
+// ==================================================
+
+function renderCategoryTabs() {
+
+  const categories = [
+    "All",
+    ...CATEGORY_ORDER
+  ];
+
+
+  categoryTabs.innerHTML =
+    categories
+      .map(
+        category => {
+
+          const count =
+            category === "All"
+              ? players.length
+              : players.filter(
+                  player =>
+                    player.category ===
+                    category
+                ).length;
+
+
+          const activeClass =
+            category ===
+            activeCategory
+              ? " active"
+              : "";
+
+
+          return `
+
+            <button
+              type="button"
+              class="category-tab${activeClass}"
+              data-category="${escapeHtml(category)}"
+            >
+              ${escapeHtml(category)}
+              <span>
+                ${count}
+              </span>
+            </button>
+
+          `;
+
+        }
+      )
+      .join("");
+
+}
+
+
+
+categoryTabs
+  .addEventListener(
+    "click",
+    event => {
+
+      const tab =
+        event.target.closest(
+          ".category-tab"
         );
 
 
-      row.className =
-        "player";
+      if (
+        !tab
+      ) {
+
+        return;
+
+      }
 
 
-      const stars =
-        "★".repeat(
-          player.skill
-        ) +
-        "☆".repeat(
-          5 -
-          player.skill
-        );
+      activeCategory =
+        tab.dataset.category;
 
 
-      row.innerHTML = `
-
-        <input
-          type="checkbox"
-          class="playerCheckbox"
-          data-id="${player.id}"
-        >
-
-        <div>
-
-          <div class="player-name">
-            ${player.name}
-          </div>
-
-          <div class="player-info">
-            ${player.category}
-          </div>
-
-        </div>
-
-        <div class="skill">
-          ${stars}
-        </div>
-
-      `;
+      renderPlayerInterface();
 
 
-      playerList.appendChild(
-        row
-      );
+      if (
+        !quickAddForm.hidden
+      ) {
+
+        updateQuickAddContext();
+
+      }
 
     }
   );
 
 
-  updatePlayerSummary();
+
+// ==================================================
+// PLAYER LIST
+// ==================================================
+
+function renderPlayers() {
+
+  const visiblePlayers =
+    getVisiblePlayers();
+
+
+  playerList.innerHTML =
+    visiblePlayers
+      .map(
+        player => {
+
+          const checked =
+            presentPlayerIds.has(
+              player.id
+            )
+              ? "checked"
+              : "";
+
+
+          const localBadge =
+            player.source ===
+            "local"
+              ? `
+                <span class="new-player-badge">
+                  New
+                </span>
+              `
+              : "";
+
+
+          const deleteButton =
+            player.source ===
+            "local"
+              ? `
+
+                <button
+                  type="button"
+                  class="delete-player-button"
+                  data-delete-player-id="${escapeHtml(player.id)}"
+                  title="Delete player"
+                  aria-label="Delete ${escapeHtml(player.name)}"
+                >
+                  🗑️
+                </button>
+
+              `
+              : `
+                <span class="player-action-placeholder"></span>
+              `;
+
+
+          const checkboxId =
+            `attendance_${player.id}`;
+
+
+          return `
+
+            <div class="player">
+
+              <input
+                id="${escapeHtml(checkboxId)}"
+                type="checkbox"
+                class="playerCheckbox"
+                data-id="${escapeHtml(player.id)}"
+                ${checked}
+              >
+
+
+              <label
+                class="player-details"
+                for="${escapeHtml(checkboxId)}"
+              >
+
+                <div class="player-name">
+
+                  ${escapeHtml(player.name)}
+
+                  ${localBadge}
+
+                </div>
+
+                <div class="player-info">
+                  ${escapeHtml(player.category)}
+                </div>
+
+              </label>
+
+
+              <label
+                class="skill"
+                for="${escapeHtml(checkboxId)}"
+              >
+                ${
+                  "★".repeat(
+                    player.skill
+                  ) +
+                  "☆".repeat(
+                    5 -
+                    player.skill
+                  )
+                }
+              </label>
+
+
+              <div class="player-actions">
+                ${deleteButton}
+              </div>
+
+            </div>
+
+          `;
+
+        }
+      )
+      .join("");
+
+
+  if (
+    visiblePlayers.length === 0
+  ) {
+
+    playerList.innerHTML = `
+
+      <div class="empty-player-list">
+
+        No players in this category yet.
+
+      </div>
+
+    `;
+
+  }
 
 }
 
 
 
 // ==================================================
-// ATTENDANCE
+// PLAYER SUMMARY
 // ==================================================
 
 function updatePlayerSummary() {
 
-  const selected =
-    document.querySelectorAll(
-      ".playerCheckbox:checked"
-    ).length;
+  const visiblePlayers =
+    getVisiblePlayers();
 
 
   playerSummary.textContent =
-    `${selected} of ${players.length} players present`;
+    `${presentPlayerIds.size} of ${players.length} players present · ${visiblePlayers.length} shown`;
+
+
+  updateSelectAllButton();
 
 }
 
 
 
-playerList.addEventListener(
-  "change",
-  updatePlayerSummary
-);
-
-
-
 // ==================================================
-// SELECT ALL
+// SELECT ALL / CLEAR VISIBLE
 // ==================================================
+
+function updateSelectAllButton() {
+
+  const button =
+    document.getElementById(
+      "selectAll"
+    );
+
+
+  const visiblePlayers =
+    getVisiblePlayers();
+
+
+  if (
+    visiblePlayers.length === 0
+  ) {
+
+    button.disabled =
+      true;
+
+
+    button.textContent =
+      "Select all";
+
+
+    return;
+
+  }
+
+
+  button.disabled =
+    false;
+
+
+  const allVisibleSelected =
+    visiblePlayers.every(
+      player =>
+        presentPlayerIds.has(
+          player.id
+        )
+    );
+
+
+  button.textContent =
+    allVisibleSelected
+      ? "Clear visible"
+      : "Select all";
+
+}
+
+
 
 document
   .getElementById(
@@ -211,34 +844,785 @@ document
     "click",
     () => {
 
-      const checkboxes =
-        document.querySelectorAll(
+      const visiblePlayers =
+        getVisiblePlayers();
+
+
+      const allVisibleSelected =
+        visiblePlayers.every(
+          player =>
+            presentPlayerIds.has(
+              player.id
+            )
+        );
+
+
+      visiblePlayers.forEach(
+        player => {
+
+          if (
+            allVisibleSelected
+          ) {
+
+            presentPlayerIds.delete(
+              player.id
+            );
+
+          }
+
+          else {
+
+            presentPlayerIds.add(
+              player.id
+            );
+
+          }
+
+        }
+      );
+
+
+      invalidateResults();
+
+
+      renderPlayerInterface();
+
+    }
+  );
+
+
+
+// ==================================================
+// ATTENDANCE CHANGES + DELETE
+// ==================================================
+
+playerList
+  .addEventListener(
+    "change",
+    event => {
+
+      const checkbox =
+        event.target.closest(
           ".playerCheckbox"
         );
 
 
-      const allSelected =
-        [...checkboxes]
-          .every(
-            checkbox =>
-              checkbox.checked
-          );
+      if (
+        !checkbox
+      ) {
+
+        return;
+
+      }
 
 
-      checkboxes.forEach(
-        checkbox => {
+      const playerId =
+        checkbox.dataset.id;
 
-          checkbox.checked =
-            !allSelected;
 
-        }
-      );
+      if (
+        checkbox.checked
+      ) {
+
+        presentPlayerIds.add(
+          playerId
+        );
+
+      }
+
+      else {
+
+        presentPlayerIds.delete(
+          playerId
+        );
+
+      }
+
+
+      invalidateResults();
 
 
       updatePlayerSummary();
 
     }
   );
+
+
+
+playerList
+  .addEventListener(
+    "click",
+    event => {
+
+      const deleteButton =
+        event.target.closest(
+          ".delete-player-button"
+        );
+
+
+      if (
+        !deleteButton
+      ) {
+
+        return;
+
+      }
+
+
+      event.preventDefault();
+
+      event.stopPropagation();
+
+
+      const playerId =
+        deleteButton.dataset
+          .deletePlayerId;
+
+
+      deleteLocalPlayer(
+        playerId
+      );
+
+    }
+  );
+
+
+
+// ==================================================
+// DELETE LOCAL PLAYER
+// ==================================================
+
+function deleteLocalPlayer(
+  playerId
+) {
+
+  const player =
+    localPlayers.find(
+      item =>
+        item.id ===
+        playerId
+    );
+
+
+  if (
+    !player
+  ) {
+
+    return;
+
+  }
+
+
+  const confirmed =
+    window.confirm(
+      `Delete ${player.name} from the locally saved player list?`
+    );
+
+
+  if (
+    !confirmed
+  ) {
+
+    return;
+
+  }
+
+
+  localPlayers =
+    localPlayers.filter(
+      item =>
+        item.id !==
+        playerId
+    );
+
+
+  presentPlayerIds.delete(
+    playerId
+  );
+
+
+  saveLocalPlayers();
+
+
+  mergePlayerSources();
+
+
+  invalidateResults();
+
+
+  renderPlayerInterface();
+
+}
+
+
+
+// ==================================================
+// QUICK ADD FORM
+// ==================================================
+
+function updateQuickAddContext() {
+
+  if (
+    activeCategory ===
+    "All"
+  ) {
+
+    addPlayerButton.textContent =
+      "+ Add player";
+
+
+    quickAddTitle.textContent =
+      "Add player";
+
+
+    quickAddDescription.textContent =
+      "Choose the category and skill level. The player will be saved on this device.";
+
+
+    quickAddCategoryRow.hidden =
+      false;
+
+  }
+
+  else {
+
+    addPlayerButton.textContent =
+      `+ Add ${activeCategory} player`;
+
+
+    quickAddTitle.textContent =
+      `Add ${activeCategory} player`;
+
+
+    quickAddDescription.textContent =
+      `The player will automatically be added to ${activeCategory} and marked present.`;
+
+
+    quickAddCategoryRow.hidden =
+      true;
+
+
+    newPlayerCategory.value =
+      activeCategory;
+
+  }
+
+}
+
+
+
+// ==================================================
+// OPEN / CLOSE QUICK ADD
+// ==================================================
+
+addPlayerButton
+  .addEventListener(
+    "click",
+    () => {
+
+      quickAddForm.hidden =
+        !quickAddForm.hidden;
+
+
+      updateQuickAddContext();
+
+
+      if (
+        !quickAddForm.hidden
+      ) {
+
+        setTimeout(
+          () => {
+
+            newPlayerName.focus();
+
+          },
+          0
+        );
+
+      }
+
+    }
+  );
+
+
+
+document
+  .getElementById(
+    "cancelAddPlayer"
+  )
+  .addEventListener(
+    "click",
+    () => {
+
+      closeQuickAddForm();
+
+    }
+  );
+
+
+
+function closeQuickAddForm() {
+
+  quickAddForm.hidden =
+    true;
+
+
+  newPlayerName.value =
+    "";
+
+
+  quickAddSkill =
+    3;
+
+
+  renderSkillSelector();
+
+}
+
+
+
+// ==================================================
+// SKILL SELECTOR
+// ==================================================
+
+function renderSkillSelector() {
+
+  document
+    .querySelectorAll(
+      ".skill-option"
+    )
+    .forEach(
+      button => {
+
+        const value =
+          Number(
+            button.dataset.skill
+          );
+
+
+        button.classList.toggle(
+          "active",
+          value ===
+            quickAddSkill
+        );
+
+      }
+    );
+
+}
+
+
+
+document
+  .getElementById(
+    "skillSelector"
+  )
+  .addEventListener(
+    "click",
+    event => {
+
+      const button =
+        event.target.closest(
+          ".skill-option"
+        );
+
+
+      if (
+        !button
+      ) {
+
+        return;
+
+      }
+
+
+      quickAddSkill =
+        Number(
+          button.dataset.skill
+        );
+
+
+      renderSkillSelector();
+
+    }
+  );
+
+
+
+// ==================================================
+// CREATE LOCAL PLAYER
+// ==================================================
+
+document
+  .getElementById(
+    "saveNewPlayer"
+  )
+  .addEventListener(
+    "click",
+    addLocalPlayer
+  );
+
+
+
+newPlayerName
+  .addEventListener(
+    "keydown",
+    event => {
+
+      if (
+        event.key ===
+        "Enter"
+      ) {
+
+        addLocalPlayer();
+
+      }
+
+    }
+  );
+
+
+
+function addLocalPlayer() {
+
+  const name =
+    newPlayerName.value
+      .trim()
+      .replace(
+        /\s+/g,
+        " "
+      );
+
+
+  if (
+    !name
+  ) {
+
+    alert(
+      "Enter the player's name."
+    );
+
+
+    newPlayerName.focus();
+
+
+    return;
+
+  }
+
+
+  const category =
+    activeCategory ===
+    "All"
+      ? newPlayerCategory.value
+      : activeCategory;
+
+
+  const existing =
+    players.find(
+      player =>
+        rosterKey(
+          player
+        ) ===
+        rosterKey({
+
+          name,
+
+          category
+
+        })
+    );
+
+
+  if (
+    existing
+  ) {
+
+    /*
+      Useful courtside behavior:
+      if someone tries to add an existing
+      player, simply mark them present.
+    */
+
+    presentPlayerIds.add(
+      existing.id
+    );
+
+
+    alert(
+      `${existing.name} already exists in ${existing.category} and has been marked present.`
+    );
+
+
+    closeQuickAddForm();
+
+
+    renderPlayerInterface();
+
+
+    return;
+
+  }
+
+
+  const player = {
+
+    id:
+      `L_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 7)}`,
+
+    name,
+
+    category,
+
+    skill:
+      quickAddSkill,
+
+    source:
+      "local"
+
+  };
+
+
+  localPlayers.push(
+    player
+  );
+
+
+  saveLocalPlayers();
+
+
+  mergePlayerSources();
+
+
+  /*
+    A player added courtside is almost
+    certainly present today.
+  */
+
+  presentPlayerIds.add(
+    player.id
+  );
+
+
+  invalidateResults();
+
+
+  closeQuickAddForm();
+
+
+  renderPlayerInterface();
+
+}
+
+
+
+// ==================================================
+// NEWCOMER TOOLS
+// ==================================================
+
+function renderNewcomerTools() {
+
+  const count =
+    localPlayers.length;
+
+
+  if (
+    count === 0
+  ) {
+
+    newcomerTools.hidden =
+      true;
+
+
+    return;
+
+  }
+
+
+  newcomerTools.hidden =
+    false;
+
+
+  newcomerCount.textContent =
+    count === 1
+      ? "1 new player on this device"
+      : `${count} new players on this device`;
+
+}
+
+
+
+// ==================================================
+// COPY NEWCOMER LIST
+// ==================================================
+
+copyNewcomersButton
+  .addEventListener(
+    "click",
+    async () => {
+
+      if (
+        localPlayers.length === 0
+      ) {
+
+        return;
+
+      }
+
+
+      const sorted =
+        [...localPlayers]
+          .sort(
+            (a, b) => {
+
+              const categoryDifference =
+                CATEGORY_ORDER.indexOf(
+                  a.category
+                ) -
+                CATEGORY_ORDER.indexOf(
+                  b.category
+                );
+
+
+              if (
+                categoryDifference !== 0
+              ) {
+
+                return categoryDifference;
+
+              }
+
+
+              return a.name.localeCompare(
+                b.name
+              );
+
+            }
+          );
+
+
+      const text = [
+
+        "New players for the 3x3 Team Maker:",
+
+        "",
+
+        ...sorted.map(
+          player =>
+            `${player.name} — ${player.category} — Skill ${player.skill}`
+        )
+
+      ].join(
+        "\n"
+      );
+
+
+      try {
+
+        await navigator.clipboard
+          .writeText(
+            text
+          );
+
+
+        showCopiedState();
+
+      }
+
+      catch (error) {
+
+        /*
+          Fallback for browsers where
+          Clipboard API is unavailable.
+        */
+
+        const textarea =
+          document.createElement(
+            "textarea"
+          );
+
+
+        textarea.value =
+          text;
+
+
+        textarea.style.position =
+          "fixed";
+
+
+        textarea.style.opacity =
+          "0";
+
+
+        document.body.appendChild(
+          textarea
+        );
+
+
+        textarea.select();
+
+
+        document.execCommand(
+          "copy"
+        );
+
+
+        textarea.remove();
+
+
+        showCopiedState();
+
+      }
+
+    }
+  );
+
+
+
+function showCopiedState() {
+
+  const original =
+    "Copy newcomer list";
+
+
+  copyNewcomersButton.textContent =
+    "Copied ✓";
+
+
+  setTimeout(
+    () => {
+
+      copyNewcomersButton.textContent =
+        original;
+
+    },
+    1600
+  );
+
+}
+
+
+
+// ==================================================
+// RENDER COMPLETE PLAYER INTERFACE
+// ==================================================
+
+function renderPlayerInterface() {
+
+  renderCategoryTabs();
+
+  renderPlayers();
+
+  renderNewcomerTools();
+
+  updateQuickAddContext();
+
+  updatePlayerSummary();
+
+}
 
 
 
@@ -259,6 +1643,9 @@ document
 
       courtCount.textContent =
         courts;
+
+
+      invalidateResults();
 
     }
   );
@@ -283,10 +1670,49 @@ document
         courtCount.textContent =
           courts;
 
+
+        invalidateResults();
+
       }
 
     }
   );
+
+
+
+document
+  .getElementById(
+    "gameFormat"
+  )
+  .addEventListener(
+    "change",
+    invalidateResults
+  );
+
+
+
+// ==================================================
+// INVALIDATE OLD RESULT
+// ==================================================
+
+function invalidateResults() {
+
+  currentResult =
+    null;
+
+
+  selectedSwapPlayer =
+    null;
+
+
+  lastSwapMessage =
+    "";
+
+
+  resultsSection.hidden =
+    true;
+
+}
 
 
 
@@ -299,7 +1725,8 @@ function stars(skill) {
   return (
     "★".repeat(skill) +
     "☆".repeat(
-      5 - skill
+      5 -
+      skill
     )
   );
 
@@ -325,18 +1752,18 @@ function playerRow(
     <button
       type="button"
       class="result-player swap-player${selected ? " selected-swap-player" : ""}"
-      data-team-id="${teamId}"
-      data-player-id="${player.id}"
+      data-team-id="${escapeHtml(teamId)}"
+      data-player-id="${escapeHtml(player.id)}"
     >
 
       <span class="result-player-left">
 
         <strong>
-          ${player.name}
+          ${escapeHtml(player.name)}
         </strong>
 
         <span class="category">
-          ${player.category}
+          ${escapeHtml(player.category)}
         </span>
 
       </span>
@@ -376,7 +1803,7 @@ function teamCard(team) {
       <div class="team-header">
 
         <strong>
-          ${team.name}
+          ${escapeHtml(team.name)}
         </strong>
 
         <span>
@@ -406,11 +1833,11 @@ function rotationPlayerRow(
       <span class="result-player-left">
 
         <strong>
-          ${player.name}
+          ${escapeHtml(player.name)}
         </strong>
 
         <span class="category">
-          ${player.category}
+          ${escapeHtml(player.category)}
         </span>
 
       </span>
@@ -430,7 +1857,7 @@ function rotationPlayerRow(
 
 
 // ==================================================
-// RECALCULATE TEAM AFTER MANUAL SWAP
+// RECALCULATE TEAM AFTER SWAP
 // ==================================================
 
 function recalculateTeam(
@@ -440,7 +1867,8 @@ function recalculateTeam(
   team.totalSkill =
     team.players.reduce(
       (sum, player) =>
-        sum + player.skill,
+        sum +
+        player.skill,
       0
     );
 
@@ -473,7 +1901,8 @@ function findTeam(
   return (
     currentResult.teams.find(
       team =>
-        team.id === teamId
+        team.id ===
+        teamId
     ) || null
   );
 
@@ -618,7 +2047,8 @@ function handlePlayerSwapClick(
   const player =
     team.players.find(
       item =>
-        item.id === playerId
+        item.id ===
+        playerId
     );
 
 
@@ -664,7 +2094,7 @@ function handlePlayerSwapClick(
 
 
   // ------------------------------------------------
-  // TAP SAME PLAYER AGAIN = CANCEL
+  // SAME PLAYER = CANCEL
   // ------------------------------------------------
 
   if (
@@ -694,7 +2124,7 @@ function handlePlayerSwapClick(
 
 
   // ------------------------------------------------
-  // TAP ANOTHER PLAYER IN SAME TEAM
+  // ANOTHER PLAYER IN SAME TEAM
   // = CHANGE SELECTION
   // ------------------------------------------------
 
@@ -829,7 +2259,7 @@ function handlePlayerSwapClick(
 
 
 // ==================================================
-// RESULT CLICK HANDLER
+// RESULT PLAYER CLICK HANDLER
 // ==================================================
 
 resultsSection
@@ -866,7 +2296,283 @@ resultsSection
 
 
 // ==================================================
-// RESULT RENDERING
+// RESULT SIGNATURE
+// Used to find a genuinely different alternative.
+// ==================================================
+
+function resultSignature(
+  result
+) {
+
+  const courtsSignature =
+    result.courtGames
+      .map(
+        game => {
+
+          const team1 =
+            game.team1.players
+              .map(
+                player =>
+                  player.id
+              )
+              .sort()
+              .join(",");
+
+
+          const team2 =
+            game.team2.players
+              .map(
+                player =>
+                  player.id
+              )
+              .sort()
+              .join(",");
+
+
+          return [
+            team1,
+            team2
+          ]
+            .sort()
+            .join(" VS ");
+
+        }
+      )
+      .sort();
+
+
+  const waitingSignature =
+    result.waitingTeams
+      .map(
+        team =>
+          team.players
+            .map(
+              player =>
+                player.id
+            )
+            .sort()
+            .join(",")
+      )
+      .sort();
+
+
+  const rotationSignature =
+    result.rotationPlayers
+      .map(
+        player =>
+          player.id
+      )
+      .sort();
+
+
+  return JSON.stringify({
+
+    courts:
+      courtsSignature,
+
+    waiting:
+      waitingSignature,
+
+    rotation:
+      rotationSignature
+
+  });
+
+}
+
+
+
+// ==================================================
+// CURRENT PRESENT PLAYERS
+// ==================================================
+
+function getPresentPlayers() {
+
+  return players.filter(
+    player =>
+      presentPlayerIds.has(
+        player.id
+      )
+  );
+
+}
+
+
+
+// ==================================================
+// GENERATE RESULT
+// ==================================================
+
+function generateTeams(
+  alternative = false
+) {
+
+  const selectedPlayers =
+    getPresentPlayers();
+
+
+  if (
+    selectedPlayers.length < 6
+  ) {
+
+    alert(
+      "Select at least 6 players."
+    );
+
+
+    return;
+
+  }
+
+
+  const formatPreference =
+    document
+      .getElementById(
+        "gameFormat"
+      )
+      .value;
+
+
+  try {
+
+    selectedSwapPlayer =
+      null;
+
+
+    lastSwapMessage =
+      "";
+
+
+    let result =
+      TeamOptimizer.generate(
+        selectedPlayers,
+        courts,
+        formatPreference
+      );
+
+
+    /*
+      When Alternative is requested,
+      try several times to find a genuinely
+      different arrangement.
+    */
+
+    if (
+      alternative &&
+      currentResult
+    ) {
+
+      const previousSignature =
+        resultSignature(
+          currentResult
+        );
+
+
+      for (
+        let attempt = 0;
+        attempt < 10;
+        attempt++
+      ) {
+
+        const candidate =
+          TeamOptimizer.generate(
+            selectedPlayers,
+            courts,
+            formatPreference
+          );
+
+
+        if (
+          resultSignature(
+            candidate
+          ) !==
+          previousSignature
+        ) {
+
+          result =
+            candidate;
+
+
+          break;
+
+        }
+
+
+        result =
+          candidate;
+
+      }
+
+    }
+
+
+    renderResult(
+      result
+    );
+
+  }
+
+  catch (error) {
+
+    alert(
+      error.message
+    );
+
+
+    console.error(
+      error
+    );
+
+  }
+
+}
+
+
+
+// ==================================================
+// CREATE BALANCED TEAMS BUTTON
+// ==================================================
+
+document
+  .getElementById(
+    "generateButton"
+  )
+  .addEventListener(
+    "click",
+    () => {
+
+      generateTeams(
+        false
+      );
+
+    }
+  );
+
+
+
+// ==================================================
+// ALTERNATIVE BUTTON
+// ==================================================
+
+document
+  .getElementById(
+    "alternativeButton"
+  )
+  .addEventListener(
+    "click",
+    () => {
+
+      generateTeams(
+        true
+      );
+
+    }
+  );
+
+
+
+// ==================================================
+// RENDER RESULT
 // ==================================================
 
 function renderResult(
@@ -913,84 +2619,80 @@ function renderResult(
   }
 
 
-  const recommendationText = `
-
-    <div class="recommendation-title">
-
-      Recommended:
-      <strong>
-        ${formatText}
-      </strong>
-
-    </div>
-
-
-    <div class="recommendation-grid">
-
-      <div>
-
-        <strong>
-          ${plan.completeTeams}
-        </strong>
-
-        <span>
-          teams
-        </span>
-
-      </div>
-
-
-      <div>
-
-        <strong>
-          ${plan.playableCourts}
-        </strong>
-
-        <span>
-          courts used
-        </span>
-
-      </div>
-
-
-      <div>
-
-        <strong>
-          ${plan.waitingTeams}
-        </strong>
-
-        <span>
-          waiting teams
-        </span>
-
-      </div>
-
-
-      <div>
-
-        <strong>
-          ${plan.individualRotation}
-        </strong>
-
-        <span>
-          rotating players
-        </span>
-
-      </div>
-
-    </div>
-
-    ${specialNote}
-
-  `;
-
-
   document
     .getElementById(
       "recommendation"
     )
-    .innerHTML =
-      recommendationText;
+    .innerHTML = `
+
+      <div class="recommendation-title">
+
+        Recommended:
+        <strong>
+          ${escapeHtml(formatText)}
+        </strong>
+
+      </div>
+
+
+      <div class="recommendation-grid">
+
+        <div>
+
+          <strong>
+            ${plan.completeTeams}
+          </strong>
+
+          <span>
+            teams
+          </span>
+
+        </div>
+
+
+        <div>
+
+          <strong>
+            ${plan.playableCourts}
+          </strong>
+
+          <span>
+            courts used
+          </span>
+
+        </div>
+
+
+        <div>
+
+          <strong>
+            ${plan.waitingTeams}
+          </strong>
+
+          <span>
+            waiting teams
+          </span>
+
+        </div>
+
+
+        <div>
+
+          <strong>
+            ${plan.individualRotation}
+          </strong>
+
+          <span>
+            rotating players
+          </span>
+
+        </div>
+
+      </div>
+
+      ${specialNote}
+
+    `;
 
 
 
@@ -1121,7 +2823,7 @@ function renderResult(
 
 
   // ==================================================
-  // ROTATING PLAYERS
+  // ROTATION PLAYERS
   // ==================================================
 
   const rotationSection =
@@ -1161,7 +2863,6 @@ function renderResult(
   }
 
 
-
   resultsSection.hidden =
     false;
 
@@ -1186,103 +2887,6 @@ function renderResult(
   }
 
 }
-
-
-
-// ==================================================
-// GENERATE
-// ==================================================
-
-document
-  .getElementById(
-    "generateButton"
-  )
-  .addEventListener(
-    "click",
-    () => {
-
-      const selectedIds =
-        [
-          ...document.querySelectorAll(
-            ".playerCheckbox:checked"
-          )
-        ]
-        .map(
-          checkbox =>
-            checkbox.dataset.id
-        );
-
-
-      const selectedPlayers =
-        players.filter(
-          player =>
-            selectedIds.includes(
-              player.id
-            )
-        );
-
-
-      if (
-        selectedPlayers.length < 6
-      ) {
-
-        alert(
-          "Select at least 6 players."
-        );
-
-
-        return;
-
-      }
-
-
-      const formatPreference =
-        document
-          .getElementById(
-            "gameFormat"
-          )
-          .value;
-
-
-      try {
-
-        selectedSwapPlayer =
-          null;
-
-
-        lastSwapMessage =
-          "";
-
-
-        const result =
-          TeamOptimizer.generate(
-            selectedPlayers,
-            courts,
-            formatPreference
-          );
-
-
-        renderResult(
-          result
-        );
-
-      }
-
-      catch (error) {
-
-        alert(
-          error.message
-        );
-
-
-        console.error(
-          error
-        );
-
-      }
-
-    }
-  );
 
 
 
