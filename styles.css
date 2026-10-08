@@ -677,6 +677,9 @@ select {
 
   cursor:
     pointer;
+
+  white-space:
+    nowrap;
 }
 
 
@@ -858,9 +861,6 @@ select {
 
 
 .skill {
-  font-size:
-    15px;
-
   white-space:
     nowrap;
 
@@ -956,6 +956,60 @@ select {
 
   text-transform:
     uppercase;
+}
+
+
+
+/* ==================================================
+   BASKETBALL SKILL RATING
+================================================== */
+
+
+.skill-rating {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    flex-end;
+
+  gap:
+    1px;
+
+  white-space:
+    nowrap;
+}
+
+
+.skill-ball {
+  display:
+    inline-block;
+
+  font-size:
+    12px;
+
+  line-height:
+    1;
+
+  transition:
+    opacity 0.15s ease;
+}
+
+
+.skill-ball.active {
+  opacity:
+    1;
+}
+
+
+.skill-ball.inactive {
+  opacity:
+    0.16;
+
+  filter:
+    grayscale(1);
 }
 
 
@@ -1496,7 +1550,7 @@ select {
 }
 
 
-.swap-player {
+.swappable-player {
   cursor:
     pointer;
 
@@ -1506,13 +1560,13 @@ select {
 }
 
 
-.swap-player:hover {
+.swappable-player:hover {
   background:
     #f9fafb;
 }
 
 
-.swap-player:active {
+.swappable-player:active {
   background:
     #f3f4f6;
 }
@@ -1552,7 +1606,22 @@ select {
 
 .rotation-player {
   cursor:
-    default;
+    pointer;
+
+  background:
+    #fafafa;
+}
+
+
+.rotation-player:hover {
+  background:
+    #f3f4f6;
+}
+
+
+.rotation-player.selected-swap-player {
+  background:
+    #fff7ed;
 }
 
 
@@ -1581,9 +1650,6 @@ select {
 
 
 .result-skill {
-  font-size:
-    13px;
-
   white-space:
     nowrap;
 
@@ -1782,6 +1848,12 @@ select {
   .player {
     grid-template-columns:
       30px 1fr auto 36px;
+  }
+
+
+  .skill-ball {
+    font-size:
+      11px;
   }
 
 }
