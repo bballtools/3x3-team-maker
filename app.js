@@ -51,29 +51,8 @@ let selectedSwapPlayer = null;
 let lastSwapMessage = "";
 
 
-/*
-  Approved formations are the ONLY formations
-  considered to have actually been used.
-*/
-
 let approvedFormations = [];
 
-
-/*
-  Round numbering is separate from suggestion
-  numbering.
-
-  Round 1:
-    Suggestion #1
-    Suggestion #2
-    ...
-
-  Approve
-
-  Round 2:
-    Suggestion #1
-    ...
-*/
 
 let currentRoundNumber = 1;
 
@@ -274,6 +253,53 @@ function escapeHtml(value) {
 
 
 // ==================================================
+// SKILL DISPLAY
+// ==================================================
+
+function skillBasketballs(
+  skill
+) {
+
+  const balls = [];
+
+
+  for (
+    let level = 1;
+    level <= 5;
+    level++
+  ) {
+
+    balls.push(`
+
+      <span
+        class="skill-ball ${level <= skill ? "active" : "inactive"}"
+        aria-hidden="true"
+      >
+        🏀
+      </span>
+
+    `);
+
+  }
+
+
+  return `
+
+    <span
+      class="skill-rating"
+      aria-label="Skill ${skill} out of 5"
+      title="Skill ${skill} out of 5"
+    >
+      ${balls.join("")}
+    </span>
+
+  `;
+
+}
+
+
+
+// ==================================================
 // LOCAL DATE
 // ==================================================
 
@@ -381,11 +407,6 @@ function loadEveningSession() {
         raw
       );
 
-
-    /*
-      Session history automatically starts
-      fresh on a new calendar day.
-    */
 
     if (
       !stored ||
@@ -574,15 +595,6 @@ function startNewSession() {
 
   }
 
-
-  /*
-    Remove ONLY the current session history.
-
-    Do not touch:
-    - central players
-    - local newcomers
-    - newcomer storage
-  */
 
   localStorage.removeItem(
     EVENING_SESSION_KEY
@@ -1187,15 +1199,9 @@ function renderPlayers() {
                 for="${escapeHtml(checkboxId)}"
               >
 
-                ${
-                  "★".repeat(
-                    player.skill
-                  ) +
-                  "☆".repeat(
-                    5 -
-                    player.skill
-                  )
-                }
+                ${skillBasketballs(
+                  player.skill
+                )}
 
               </label>
 
@@ -2198,22 +2204,8 @@ function invalidateResults() {
 
 
 // ==================================================
-// DISPLAY HELPERS
+// RESULT DISPLAY HELPERS
 // ==================================================
-
-function stars(skill) {
-
-  return (
-    "★".repeat(skill) +
-    "☆".repeat(
-      5 -
-      skill
-    )
-  );
-
-}
-
-
 
 function playerRow(
   player,
@@ -2222,6 +2214,8 @@ function playerRow(
 
   const selected =
     selectedSwapPlayer &&
+    selectedSwapPlayer.location ===
+      "team" &&
     selectedSwapPlayer.teamId ===
       teamId &&
     selectedSwapPlayer.playerId ===
@@ -2238,7 +2232,8 @@ function playerRow(
 
     <button
       type="button"
-      class="result-player swap-player${selected ? " selected-swap-player" : ""}${currentRoundApproved ? " locked-player" : ""}"
+      class="result-player swappable-player${selected ? " selected-swap-player" : ""}${currentRoundApproved ? " locked-player" : ""}"
+      data-location="team"
       data-team-id="${escapeHtml(teamId)}"
       data-player-id="${escapeHtml(player.id)}"
       ${disabled}
@@ -2257,9 +2252,11 @@ function playerRow(
       </span>
 
       <span class="result-skill">
-        ${stars(
+
+        ${skillBasketballs(
           player.skill
         )}
+
       </span>
 
     </button>
@@ -2314,9 +2311,29 @@ function rotationPlayerRow(
   player
 ) {
 
+  const selected =
+    selectedSwapPlayer &&
+    selectedSwapPlayer.location ===
+      "rotation" &&
+    selectedSwapPlayer.playerId ===
+      player.id;
+
+
+  const disabled =
+    currentRoundApproved
+      ? "disabled"
+      : "";
+
+
   return `
 
-    <div class="result-player rotation-player">
+    <button
+      type="button"
+      class="result-player swappable-player rotation-player${selected ? " selected-swap-player" : ""}${currentRoundApproved ? " locked-player" : ""}"
+      data-location="rotation"
+      data-player-id="${escapeHtml(player.id)}"
+      ${disabled}
+    >
 
       <span class="result-player-left">
 
@@ -2331,12 +2348,14 @@ function rotationPlayerRow(
       </span>
 
       <span class="result-skill">
-        ${stars(
+
+        ${skillBasketballs(
           player.skill
         )}
+
       </span>
 
-    </div>
+    </button>
 
   `;
 
@@ -2393,6 +2412,116 @@ function findTeam(
         teamId
     ) || null
   );
+
+}
+
+
+
+// ==================================================
+// RESOLVE SWAP SELECTION
+// ==================================================
+
+function resolveSwapSelection(
+  selection
+) {
+
+  if (
+    !selection ||
+    !currentResult
+  ) {
+
+    return null;
+
+  }
+
+
+  if (
+    selection.location ===
+    "rotation"
+  ) {
+
+    const index =
+      currentResult.rotationPlayers
+        .findIndex(
+          player =>
+            player.id ===
+            selection.playerId
+        );
+
+
+    if (
+      index === -1
+    ) {
+
+      return null;
+
+    }
+
+
+    return {
+
+      location:
+        "rotation",
+
+      index,
+
+      player:
+        currentResult
+          .rotationPlayers[index],
+
+      team:
+        null
+
+    };
+
+  }
+
+
+  const team =
+    findTeam(
+      selection.teamId
+    );
+
+
+  if (
+    !team
+  ) {
+
+    return null;
+
+  }
+
+
+  const index =
+    team.players.findIndex(
+      player =>
+        player.id ===
+        selection.playerId
+    );
+
+
+  if (
+    index === -1
+  ) {
+
+    return null;
+
+  }
+
+
+  return {
+
+    location:
+      "team",
+
+    index,
+
+    player:
+      team.players[index],
+
+    team
+
+  };
 
 }
 
@@ -2578,7 +2707,7 @@ function updateSwapStatus() {
   ) {
 
     swapStatus.textContent =
-      "Tap a player, then tap a player from another team to swap them.";
+      "Tap any player, then tap another player to swap them.";
 
 
     clearSwapButton.disabled =
@@ -2590,34 +2719,57 @@ function updateSwapStatus() {
   }
 
 
-  const team =
-    findTeam(
-      selectedSwapPlayer.teamId
+  const resolved =
+    resolveSwapSelection(
+      selectedSwapPlayer
     );
 
 
-  const player =
-    team
-      ? team.players.find(
-          item =>
-            item.id ===
-            selectedSwapPlayer.playerId
-        )
-      : null;
+  if (
+    !resolved
+  ) {
+
+    selectedSwapPlayer =
+      null;
+
+
+    swapStatus.textContent =
+      "Tap any player, then tap another player to swap them.";
+
+
+    clearSwapButton.disabled =
+      true;
+
+
+    return;
+
+  }
 
 
   if (
-    player
+    resolved.location ===
+    "rotation"
   ) {
 
     swapStatus.textContent =
-      `${player.name} selected. Now choose a player from another team.`;
+      `${resolved.player.name} selected from rotation. Now choose a player from a team.`;
 
 
     clearSwapButton.disabled =
       false;
 
+
+    return;
+
   }
+
+
+  swapStatus.textContent =
+    `${resolved.player.name} selected. Choose a player from another team or from rotation.`;
+
+
+  clearSwapButton.disabled =
+    false;
 
 }
 
@@ -2665,6 +2817,7 @@ clearSwapButton
 // ==================================================
 
 function handlePlayerSwapClick(
+  location,
   teamId,
   playerId
 ) {
@@ -2678,14 +2831,28 @@ function handlePlayerSwapClick(
   }
 
 
-  const team =
-    findTeam(
-      teamId
+  const targetSelection = {
+
+    location,
+
+    teamId:
+      location === "team"
+        ? teamId
+        : null,
+
+    playerId
+
+  };
+
+
+  const target =
+    resolveSwapSelection(
+      targetSelection
     );
 
 
   if (
-    !team
+    !target
   ) {
 
     return;
@@ -2693,34 +2860,17 @@ function handlePlayerSwapClick(
   }
 
 
-  const player =
-    team.players.find(
-      item =>
-        item.id ===
-        playerId
-    );
 
-
-  if (
-    !player
-  ) {
-
-    return;
-
-  }
-
+  // ------------------------------------------------
+  // FIRST PLAYER
+  // ------------------------------------------------
 
   if (
     !selectedSwapPlayer
   ) {
 
-    selectedSwapPlayer = {
-
-      teamId,
-
-      playerId
-
-    };
+    selectedSwapPlayer =
+      targetSelection;
 
 
     lastSwapMessage =
@@ -2738,11 +2888,44 @@ function handlePlayerSwapClick(
   }
 
 
+
+  const first =
+    resolveSwapSelection(
+      selectedSwapPlayer
+    );
+
+
   if (
+    !first
+  ) {
+
+    selectedSwapPlayer =
+      targetSelection;
+
+
+    renderResult(
+      currentResult,
+      false
+    );
+
+
+    return;
+
+  }
+
+
+
+  // ------------------------------------------------
+  // SAME PLAYER = CANCEL
+  // ------------------------------------------------
+
+  if (
+    selectedSwapPlayer.location ===
+      targetSelection.location &&
     selectedSwapPlayer.teamId ===
-      teamId &&
+      targetSelection.teamId &&
     selectedSwapPlayer.playerId ===
-      playerId
+      targetSelection.playerId
   ) {
 
     selectedSwapPlayer =
@@ -2764,18 +2947,21 @@ function handlePlayerSwapClick(
   }
 
 
+
+  // ------------------------------------------------
+  // ANOTHER PLAYER IN SAME TEAM
+  // = CHANGE SELECTION
+  // ------------------------------------------------
+
   if (
-    selectedSwapPlayer.teamId ===
-      teamId
+    first.location === "team" &&
+    target.location === "team" &&
+    first.team.id ===
+      target.team.id
   ) {
 
-    selectedSwapPlayer = {
-
-      teamId,
-
-      playerId
-
-    };
+    selectedSwapPlayer =
+      targetSelection;
 
 
     lastSwapMessage =
@@ -2793,84 +2979,138 @@ function handlePlayerSwapClick(
   }
 
 
-  const firstTeam =
-    findTeam(
-      selectedSwapPlayer.teamId
-    );
 
-
-  const secondTeam =
-    team;
-
+  // ------------------------------------------------
+  // TWO ROTATING PLAYERS
+  // = CHANGE SELECTION
+  // ------------------------------------------------
 
   if (
-    !firstTeam ||
-    !secondTeam
+    first.location === "rotation" &&
+    target.location === "rotation"
   ) {
+
+    selectedSwapPlayer =
+      targetSelection;
+
+
+    lastSwapMessage =
+      "";
+
+
+    renderResult(
+      currentResult,
+      false
+    );
+
 
     return;
 
   }
 
-
-  const firstIndex =
-    firstTeam.players.findIndex(
-      item =>
-        item.id ===
-        selectedSwapPlayer.playerId
-    );
-
-
-  const secondIndex =
-    secondTeam.players.findIndex(
-      item =>
-        item.id ===
-        playerId
-    );
-
-
-  if (
-    firstIndex === -1 ||
-    secondIndex === -1
-  ) {
-
-    return;
-
-  }
 
 
   const firstPlayer =
-    firstTeam.players[
-      firstIndex
-    ];
+    first.player;
 
 
   const secondPlayer =
-    secondTeam.players[
-      secondIndex
-    ];
+    target.player;
 
 
-  firstTeam.players[
-    firstIndex
-  ] =
-    secondPlayer;
+
+  // ------------------------------------------------
+  // TEAM ↔ TEAM
+  // ------------------------------------------------
+
+  if (
+    first.location === "team" &&
+    target.location === "team"
+  ) {
+
+    first.team.players[
+      first.index
+    ] =
+      secondPlayer;
 
 
-  secondTeam.players[
-    secondIndex
-  ] =
-    firstPlayer;
+    target.team.players[
+      target.index
+    ] =
+      firstPlayer;
 
 
-  recalculateTeam(
-    firstTeam
-  );
+    recalculateTeam(
+      first.team
+    );
 
 
-  recalculateTeam(
-    secondTeam
-  );
+    recalculateTeam(
+      target.team
+    );
+
+  }
+
+
+
+  // ------------------------------------------------
+  // TEAM ↔ ROTATION
+  // ------------------------------------------------
+
+  else if (
+    first.location === "team" &&
+    target.location === "rotation"
+  ) {
+
+    first.team.players[
+      first.index
+    ] =
+      secondPlayer;
+
+
+    currentResult
+      .rotationPlayers[
+        target.index
+      ] =
+        firstPlayer;
+
+
+    recalculateTeam(
+      first.team
+    );
+
+  }
+
+
+
+  // ------------------------------------------------
+  // ROTATION ↔ TEAM
+  // ------------------------------------------------
+
+  else if (
+    first.location === "rotation" &&
+    target.location === "team"
+  ) {
+
+    currentResult
+      .rotationPlayers[
+        first.index
+      ] =
+        secondPlayer;
+
+
+    target.team.players[
+      target.index
+    ] =
+      firstPlayer;
+
+
+    recalculateTeam(
+      target.team
+    );
+
+  }
+
 
 
   lastSwapMessage =
@@ -2880,6 +3120,11 @@ function handlePlayerSwapClick(
   selectedSwapPlayer =
     null;
 
+
+  /*
+    The manually changed formation now counts
+    as one of the suggestions already seen.
+  */
 
   seenSuggestionSignatures.add(
     resultSignature(
@@ -2908,7 +3153,7 @@ resultsSection
 
       const playerButton =
         event.target.closest(
-          ".swap-player"
+          ".swappable-player"
         );
 
 
@@ -2923,7 +3168,9 @@ resultsSection
 
       handlePlayerSwapClick(
 
-        playerButton.dataset.teamId,
+        playerButton.dataset.location,
+
+        playerButton.dataset.teamId || null,
 
         playerButton.dataset.playerId
 
@@ -3159,10 +3406,6 @@ async function generateTeams(
       "";
 
 
-    // ==================================================
-    // FIRST SUGGESTION OF ROUND
-    // ==================================================
-
     if (
       !alternative
     ) {
@@ -3236,10 +3479,6 @@ async function generateTeams(
     }
 
 
-
-    // ==================================================
-    // ALTERNATIVE INSIDE CURRENT ROUND
-    // ==================================================
 
     if (
       !currentResult ||
