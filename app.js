@@ -253,6 +253,209 @@ function escapeHtml(value) {
 
 
 // ==================================================
+// PLAYER NAME NORMALIZATION
+// ==================================================
+
+function cleanPlayerNameSpacing(
+  value
+) {
+
+  return String(value)
+    .trim()
+    .replace(
+      /\s+/g,
+      " "
+    );
+
+}
+
+
+
+function capitalizePlayerName(
+  value
+) {
+
+  const cleaned =
+    cleanPlayerNameSpacing(
+      value
+    );
+
+
+  if (
+    !cleaned
+  ) {
+
+    return "";
+
+  }
+
+
+  const lowercase =
+    cleaned.toLocaleLowerCase();
+
+
+  /*
+    Capitalize letters at the beginning of:
+    - the complete name
+    - a new word
+    - a hyphenated name
+    - an apostrophe name
+    - a name in brackets
+
+    Examples:
+    john smith      -> John Smith
+    anna-maria      -> Anna-Maria
+    o'connor        -> O'Connor
+    alex (new)      -> Alex (New)
+  */
+
+  return lowercase.replace(
+    /(^|[\s\-'"(])([a-zà-öø-ÿ])/g,
+    (
+      match,
+      prefix,
+      letter
+    ) =>
+      prefix +
+      letter.toLocaleUpperCase()
+  );
+
+}
+
+
+
+function normalizeName(
+  name
+) {
+
+  return cleanPlayerNameSpacing(
+    name
+  )
+    .toLocaleLowerCase();
+
+}
+
+
+
+/*
+  Duplicate names intentionally ignore category.
+
+  Alex in U14 and Alex in U18 are still two people
+  with the same display name, so the second player
+  needs a distinguishing name.
+*/
+
+function findPlayerWithSameName(
+  name
+) {
+
+  const normalized =
+    normalizeName(
+      name
+    );
+
+
+  return (
+    players.find(
+      player =>
+        normalizeName(
+          player.name
+        ) ===
+        normalized
+    ) || null
+  );
+
+}
+
+
+
+/*
+  If the entered name already exists, ask the leader
+  for a distinguishing name immediately.
+
+  The dialog repeats until:
+  - a unique name is entered, or
+  - the leader cancels.
+*/
+
+function requestUniquePlayerName(
+  initialName
+) {
+
+  let candidate =
+    capitalizePlayerName(
+      initialName
+    );
+
+
+  while (
+    candidate
+  ) {
+
+    const duplicate =
+      findPlayerWithSameName(
+        candidate
+      );
+
+
+    if (
+      !duplicate
+    ) {
+
+      return candidate;
+
+    }
+
+
+    const differentiatedName =
+      window.prompt(
+        `A player named "${duplicate.name}" already exists in the roster (${duplicate.category}).\n\n` +
+        "If this is another player, please give them a distinguishing name.\n\n" +
+        "For example:\n" +
+        `• ${duplicate.name} M.\n` +
+        `• ${duplicate.name} J.\n` +
+        `• ${duplicate.name} (New)\n\n` +
+        "Enter the name to use:",
+        ""
+      );
+
+
+    if (
+      differentiatedName ===
+      null
+    ) {
+
+      return null;
+
+    }
+
+
+    candidate =
+      capitalizePlayerName(
+        differentiatedName
+      );
+
+
+    if (
+      !candidate
+    ) {
+
+      alert(
+        "Please enter a name."
+      );
+
+    }
+
+  }
+
+
+  return null;
+
+}
+
+
+
+// ==================================================
 // SKILL DISPLAY
 // ==================================================
 
@@ -661,22 +864,8 @@ startNewSessionButton
 
 
 // ==================================================
-// PLAYER NORMALIZATION
+// MASTER / LOCAL ROSTER MATCHING
 // ==================================================
-
-function normalizeName(name) {
-
-  return String(name)
-    .trim()
-    .toLocaleLowerCase()
-    .replace(
-      /\s+/g,
-      " "
-    );
-
-}
-
-
 
 function rosterKey(player) {
 
@@ -1649,6 +1838,25 @@ function closeQuickAddForm() {
 
 
 // ==================================================
+// AUTOMATIC NAME CAPITALIZATION
+// ==================================================
+
+newPlayerName
+  .addEventListener(
+    "blur",
+    () => {
+
+      newPlayerName.value =
+        capitalizePlayerName(
+          newPlayerName.value
+        );
+
+    }
+  );
+
+
+
+// ==================================================
 // SKILL SELECTOR
 // ==================================================
 
@@ -1752,17 +1960,18 @@ newPlayerName
 
 function addLocalPlayer() {
 
-  const name =
-    newPlayerName.value
-      .trim()
-      .replace(
-        /\s+/g,
-        " "
-      );
+  const enteredName =
+    capitalizePlayerName(
+      newPlayerName.value
+    );
+
+
+  newPlayerName.value =
+    enteredName;
 
 
   if (
-    !name
+    !enteredName
   ) {
 
     alert(
@@ -1778,52 +1987,41 @@ function addLocalPlayer() {
   }
 
 
-  const category =
-    activeCategory ===
-    "All"
-      ? newPlayerCategory.value
-      : activeCategory;
+  /*
+    Check duplicate name across the complete roster,
+    regardless of category and letter case.
 
+    If a duplicate exists, ask for differentiation
+    instead of marking the existing person present.
+  */
 
-  const existing =
-    players.find(
-      player =>
-        rosterKey(
-          player
-        ) ===
-        rosterKey({
-
-          name,
-
-          category
-
-        })
+  const uniqueName =
+    requestUniquePlayerName(
+      enteredName
     );
 
 
   if (
-    existing
+    uniqueName === null
   ) {
 
-    presentPlayerIds.add(
-      existing.id
-    );
-
-
-    alert(
-      `${existing.name} already exists in ${existing.category} and has been marked present.`
-    );
-
-
-    closeQuickAddForm();
-
-
-    renderPlayerInterface();
+    newPlayerName.focus();
 
 
     return;
 
   }
+
+
+  newPlayerName.value =
+    uniqueName;
+
+
+  const category =
+    activeCategory ===
+    "All"
+      ? newPlayerCategory.value
+      : activeCategory;
 
 
   const player = {
@@ -1833,7 +2031,8 @@ function addLocalPlayer() {
         .toString(36)
         .slice(2, 7)}`,
 
-    name,
+    name:
+      uniqueName,
 
     category,
 
@@ -2860,11 +3059,6 @@ function handlePlayerSwapClick(
   }
 
 
-
-  // ------------------------------------------------
-  // FIRST PLAYER
-  // ------------------------------------------------
-
   if (
     !selectedSwapPlayer
   ) {
@@ -2886,7 +3080,6 @@ function handlePlayerSwapClick(
     return;
 
   }
-
 
 
   const first =
@@ -2913,11 +3106,6 @@ function handlePlayerSwapClick(
 
   }
 
-
-
-  // ------------------------------------------------
-  // SAME PLAYER = CANCEL
-  // ------------------------------------------------
 
   if (
     selectedSwapPlayer.location ===
@@ -2947,12 +3135,6 @@ function handlePlayerSwapClick(
   }
 
 
-
-  // ------------------------------------------------
-  // ANOTHER PLAYER IN SAME TEAM
-  // = CHANGE SELECTION
-  // ------------------------------------------------
-
   if (
     first.location === "team" &&
     target.location === "team" &&
@@ -2979,12 +3161,6 @@ function handlePlayerSwapClick(
   }
 
 
-
-  // ------------------------------------------------
-  // TWO ROTATING PLAYERS
-  // = CHANGE SELECTION
-  // ------------------------------------------------
-
   if (
     first.location === "rotation" &&
     target.location === "rotation"
@@ -3009,7 +3185,6 @@ function handlePlayerSwapClick(
   }
 
 
-
   const firstPlayer =
     first.player;
 
@@ -3017,11 +3192,6 @@ function handlePlayerSwapClick(
   const secondPlayer =
     target.player;
 
-
-
-  // ------------------------------------------------
-  // TEAM ↔ TEAM
-  // ------------------------------------------------
 
   if (
     first.location === "team" &&
@@ -3051,11 +3221,6 @@ function handlePlayerSwapClick(
 
   }
 
-
-
-  // ------------------------------------------------
-  // TEAM ↔ ROTATION
-  // ------------------------------------------------
 
   else if (
     first.location === "team" &&
@@ -3082,11 +3247,6 @@ function handlePlayerSwapClick(
   }
 
 
-
-  // ------------------------------------------------
-  // ROTATION ↔ TEAM
-  // ------------------------------------------------
-
   else if (
     first.location === "rotation" &&
     target.location === "team"
@@ -3112,7 +3272,6 @@ function handlePlayerSwapClick(
   }
 
 
-
   lastSwapMessage =
     `Swapped ${firstPlayer.name} and ${secondPlayer.name}.`;
 
@@ -3120,11 +3279,6 @@ function handlePlayerSwapClick(
   selectedSwapPlayer =
     null;
 
-
-  /*
-    The manually changed formation now counts
-    as one of the suggestions already seen.
-  */
 
   seenSuggestionSignatures.add(
     resultSignature(
@@ -3477,7 +3631,6 @@ async function generateTeams(
       return;
 
     }
-
 
 
     if (
