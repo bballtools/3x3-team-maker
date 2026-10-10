@@ -184,6 +184,42 @@
 
 
 
+    <!-- PLAYER SEARCH -->
+
+    <div class="player-search">
+
+      <span
+        class="player-search-icon"
+        aria-hidden="true"
+      >
+        🔎
+      </span>
+
+      <input
+        id="playerSearchInput"
+        class="player-search-input"
+        type="search"
+        placeholder="Search player..."
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Search players"
+      >
+
+      <button
+        id="clearPlayerSearch"
+        class="clear-search-button"
+        type="button"
+        aria-label="Clear player search"
+        title="Clear search"
+        hidden
+      >
+        ×
+      </button>
+
+    </div>
+
+
+
     <div
       id="categoryTabs"
       class="category-tabs"
@@ -398,6 +434,10 @@
   </section>
 
 
+
+  <!-- ==================================================
+       GENERATE
+  =================================================== -->
 
   <button
     id="generateButton"
