@@ -441,6 +441,147 @@ select {
 
 
 /* ==================================================
+   PLAYER SEARCH
+================================================== */
+
+
+.player-search {
+  position:
+    relative;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  width:
+    100%;
+
+  margin:
+    2px 0 12px;
+}
+
+
+.player-search-icon {
+  position:
+    absolute;
+
+  left:
+    13px;
+
+  pointer-events:
+    none;
+
+  font-size:
+    15px;
+}
+
+
+.player-search-input {
+  width:
+    100%;
+
+  height:
+    44px;
+
+  padding:
+    10px 42px 10px 40px;
+
+  border:
+    1px solid #d1d5db;
+
+  border-radius:
+    10px;
+
+  background:
+    #f9fafb;
+
+  color:
+    #1f2937;
+
+  outline:
+    none;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.player-search-input:focus {
+  background:
+    white;
+
+  border-color:
+    #f97316;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(249, 115, 22, 0.12);
+}
+
+
+.player-search-input::placeholder {
+  color:
+    #9ca3af;
+}
+
+
+.player-search-input::-webkit-search-cancel-button {
+  display:
+    none;
+}
+
+
+.clear-search-button {
+  position:
+    absolute;
+
+  right:
+    7px;
+
+  width:
+    32px;
+
+  height:
+    32px;
+
+  border:
+    none;
+
+  border-radius:
+    8px;
+
+  background:
+    transparent;
+
+  color:
+    #6b7280;
+
+  font-size:
+    23px;
+
+  line-height:
+    1;
+
+  cursor:
+    pointer;
+}
+
+
+.clear-search-button:hover {
+  background:
+    #e5e7eb;
+
+  color:
+    #111827;
+}
+
+
+
+/* ==================================================
    CATEGORY TABS
 ================================================== */
 
@@ -1722,6 +1863,12 @@ select {
 
     letter-spacing:
       0.3px;
+  }
+
+
+  .player-search-input {
+    font-size:
+      16px;
   }
 
 
