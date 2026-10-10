@@ -37,6 +37,10 @@ let activeCategory =
   "All";
 
 
+let playerSearchQuery =
+  "";
+
+
 let presentPlayerIds =
   new Set();
 
@@ -84,6 +88,18 @@ const playerList =
 const playerSummary =
   document.getElementById(
     "playerSummary"
+  );
+
+
+const playerSearchInput =
+  document.getElementById(
+    "playerSearchInput"
+  );
+
+
+const clearPlayerSearch =
+  document.getElementById(
+    "clearPlayerSearch"
   );
 
 
@@ -294,21 +310,6 @@ function capitalizePlayerName(
     cleaned.toLocaleLowerCase();
 
 
-  /*
-    Capitalize letters at the beginning of:
-    - the complete name
-    - a new word
-    - a hyphenated name
-    - an apostrophe name
-    - a name in brackets
-
-    Examples:
-    john smith      -> John Smith
-    anna-maria      -> Anna-Maria
-    o'connor        -> O'Connor
-    alex (new)      -> Alex (New)
-  */
-
   return lowercase.replace(
     /(^|[\s\-'"(])([a-zà-öø-ÿ])/g,
     (
@@ -337,14 +338,6 @@ function normalizeName(
 
 
 
-/*
-  Duplicate names intentionally ignore category.
-
-  Alex in U14 and Alex in U18 are still two people
-  with the same display name, so the second player
-  needs a distinguishing name.
-*/
-
 function findPlayerWithSameName(
   name
 ) {
@@ -368,15 +361,6 @@ function findPlayerWithSameName(
 }
 
 
-
-/*
-  If the entered name already exists, ask the leader
-  for a distinguishing name immediately.
-
-  The dialog repeats until:
-  - a unique name is entered, or
-  - the leader cancels.
-*/
 
 function requestUniquePlayerName(
   initialName
@@ -836,6 +820,14 @@ function startNewSession() {
     "All";
 
 
+  playerSearchQuery =
+    "";
+
+
+  playerSearchInput.value =
+    "";
+
+
   resetAlternativeHistory();
 
 
@@ -1163,27 +1155,111 @@ function sortPlayersByName(
 
 function getVisiblePlayers() {
 
-  if (
+  let visible =
     activeCategory ===
     "All"
+      ? [...players]
+      : players.filter(
+          player =>
+            player.category ===
+            activeCategory
+        );
+
+
+  const normalizedSearch =
+    normalizeName(
+      playerSearchQuery
+    );
+
+
+  if (
+    normalizedSearch
   ) {
 
-    return sortPlayersByName(
-      players
-    );
+    visible =
+      visible.filter(
+        player =>
+          normalizeName(
+            player.name
+          ).includes(
+            normalizedSearch
+          )
+      );
 
   }
 
 
   return sortPlayersByName(
-    players.filter(
-      player =>
-        player.category ===
-        activeCategory
-    )
+    visible
   );
 
 }
+
+
+
+// ==================================================
+// PLAYER SEARCH
+// ==================================================
+
+function updatePlayerSearchState() {
+
+  const hasSearch =
+    normalizeName(
+      playerSearchQuery
+    ).length > 0;
+
+
+  clearPlayerSearch.hidden =
+    !hasSearch;
+
+}
+
+
+
+playerSearchInput
+  .addEventListener(
+    "input",
+    () => {
+
+      playerSearchQuery =
+        playerSearchInput.value;
+
+
+      renderPlayers();
+
+      updatePlayerSummary();
+
+      updatePlayerSearchState();
+
+    }
+  );
+
+
+
+clearPlayerSearch
+  .addEventListener(
+    "click",
+    () => {
+
+      playerSearchQuery =
+        "";
+
+
+      playerSearchInput.value =
+        "";
+
+
+      renderPlayers();
+
+      updatePlayerSummary();
+
+      updatePlayerSearchState();
+
+
+      playerSearchInput.focus();
+
+    }
+  );
 
 
 
@@ -1412,10 +1488,22 @@ function renderPlayers() {
     visiblePlayers.length === 0
   ) {
 
+    const hasSearch =
+      normalizeName(
+        playerSearchQuery
+      ).length > 0;
+
+
     playerList.innerHTML = `
 
       <div class="empty-player-list">
-        No players in this category yet.
+
+        ${
+          hasSearch
+            ? "No players match your search."
+            : "No players in this category yet."
+        }
+
       </div>
 
     `;
@@ -1436,8 +1524,27 @@ function updatePlayerSummary() {
     getVisiblePlayers();
 
 
-  playerSummary.textContent =
-    `${presentPlayerIds.size} of ${players.length} players present · ${visiblePlayers.length} shown`;
+  const hasSearch =
+    normalizeName(
+      playerSearchQuery
+    ).length > 0;
+
+
+  if (
+    hasSearch
+  ) {
+
+    playerSummary.textContent =
+      `${presentPlayerIds.size} of ${players.length} players present · ${visiblePlayers.length} matches`;
+
+  }
+
+  else {
+
+    playerSummary.textContent =
+      `${presentPlayerIds.size} of ${players.length} players present · ${visiblePlayers.length} shown`;
+
+  }
 
 
   updateSelectAllButton();
@@ -1987,14 +2094,6 @@ function addLocalPlayer() {
   }
 
 
-  /*
-    Check duplicate name across the complete roster,
-    regardless of category and letter case.
-
-    If a duplicate exists, ask for differentiation
-    instead of marking the existing person present.
-  */
-
   const uniqueName =
     requestUniquePlayerName(
       enteredName
@@ -2267,6 +2366,8 @@ function renderPlayerInterface() {
   updateQuickAddContext();
 
   updatePlayerSummary();
+
+  updatePlayerSearchState();
 
 }
 
@@ -4220,10 +4321,6 @@ function renderResult(
 
 
 
-  // ==================================================
-  // COURTS
-  // ==================================================
-
   const courtResults =
     document.getElementById(
       "courtResults"
@@ -4292,10 +4389,6 @@ function renderResult(
 
 
 
-  // ==================================================
-  // WAITING TEAMS
-  // ==================================================
-
   const waitingSection =
     document.getElementById(
       "waitingSection"
@@ -4345,10 +4438,6 @@ function renderResult(
   }
 
 
-
-  // ==================================================
-  // ROTATION PLAYERS
-  // ==================================================
 
   const rotationSection =
     document.getElementById(
