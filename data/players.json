@@ -34,5 +34,5 @@
   { "id": "P033", "name": "Frans",        "category": "18+",  "skill": 3 },
   { "id": "P034", "name": "Niels",        "category": "U18",  "skill": 4 },
   { "id": "P035", "name": "Yiannis",      "category": "U16",  "skill": 3 },
-  { "id": "P036", "name": "Lotte",        "category": "U18",  "skill": 3 },
+  { "id": "P036", "name": "Lotte",        "category": "U18",  "skill": 3 }
 ]
