@@ -36,5 +36,17 @@
   { "id": "P035", "name": "Yiannis",      "category": "U16",  "skill": 3 },
   { "id": "P036", "name": "Lotte",        "category": "U18",  "skill": 3 },
   { "id": "P037", "name": "Gregory",      "category": "18+",  "skill": 5 },
-  { "id": "P038", "name": "Wiebe",        "category": "18+",  "skill": 5 }
+  { "id": "P038", "name": "Wiebe",        "category": "18+",  "skill": 5 },
+  { "id": "P039", "name": "Lois",         "category": "Kids", "skill": 1 },
+  { "id": "P040", "name": "Finn",         "category": "U14",  "skill": 2 },
+  { "id": "P041", "name": "Levi U14",     "category": "U14",  "skill": 2 },
+  { "id": "P042", "name": "Jelte",        "category": "U16",  "skill": 2 },
+  { "id": "P043", "name": "Boaz",         "category": "18+",  "skill": 4 },
+  { "id": "P044", "name": "Do-Minh",      "category": "18+",  "skill": 3 },
+  { "id": "P045", "name": "Lisanne",      "category": "18+",  "skill": 2 },
+  { "id": "P046", "name": "Matthijs",     "category": "18+",  "skill": 5 },
+  { "id": "P047", "name": "Yannick",      "category": "18+",  "skill": 5 },
+  { "id": "P048", "name": "Yari",         "category": "18+",  "skill": 4 },
+  { "id": "P049", "name": "Aidan",        "category": "U16",  "skill": 3 },
+  { "id": "P050", "name": "Mikhail",      "category": "U16",  "skill": 3 }
 ]
