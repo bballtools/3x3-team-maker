@@ -58,5 +58,7 @@
   { "id": "P057", "name": "Aiden Keizer", "category": "U16",  "skill": 3 },
   { "id": "P058", "name": "Imran",        "category": "18+",  "skill": 2 },
   { "id": "P059", "name": "Noël",         "category": "U18",  "skill": 2 },
-  { "id": "P060", "name": "Gijs",         "category": "U18",  "skill": 3 }  
+  { "id": "P060", "name": "Gijs",         "category": "U18",  "skill": 3 },
+  { "id": "P061", "name": "Bing",         "category": "Kids", "skill": 3 },
+  { "id": "P062", "name": "Randdolph",    "category": "18+",  "skill": 5 },
 ]
