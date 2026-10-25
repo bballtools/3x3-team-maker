@@ -53,5 +53,6 @@
   { "id": "P052", "name": "Elvis",        "category": "U16",  "skill": 3 },
   { "id": "P053", "name": "Nino",         "category": "U16",  "skill": 3 },
   { "id": "P054", "name": "Jop",          "category": "18+",  "skill": 4 },
-  { "id": "P055", "name": "Birk",         "category": "18+",  "skill": 5 }
+  { "id": "P055", "name": "Birk",         "category": "18+",  "skill": 5 },
+  { "id": "P056", "name": "Bas",          "category": "18+",  "skill": 5 }
 ]
