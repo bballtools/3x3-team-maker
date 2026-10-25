@@ -10,7 +10,7 @@
   { "id": "P009", "name": "Michael",      "category": "18+",  "skill": 2 },
   { "id": "P010", "name": "Levi",         "category": "U18",  "skill": 3 },
   { "id": "P011", "name": "Sebastiaan",   "category": "U16",  "skill": 3 },
-  { "id": "P012", "name": "Xenn",         "category": "18+",  "skill": 4 },
+  { "id": "P012", "name": "Xenn",         "category": "18+",  "skill": 5 },
   { "id": "P013", "name": "Riou",         "category": "U16",  "skill": 4 },
   { "id": "P014", "name": "Jeremiah",     "category": "U16",  "skill": 3 },
   { "id": "P015", "name": "Tristan",      "category": "U16",  "skill": 3 },
