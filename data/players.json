@@ -69,5 +69,6 @@
   { "id": "P067", "name": "Gino",         "category": "U14",  "skill": 1 },
   { "id": "P068", "name": "Oltian",       "category": "U16",  "skill": 4 },
   { "id": "P069", "name": "Thom",         "category": "18+",  "skill": 3 },
-  { "id": "P070", "name": "Roy Marcelino", "category": "18+",  "skill": 4 }
+  { "id": "P070", "name": "Roy Marcelino", "category": "18+",  "skill": 4 },
+  { "id": "P071", "name": "Lee (Lesley)",  "category": "18+",  "skill": 2 }
 ]
