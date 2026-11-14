@@ -33,12 +33,25 @@ let players = [];
 
 let courts = 2;
 
+const adultOnlyMode =
+  document.getElementById("adultOnlyMode");
+
+const adultCourtMaximum =
+  document.getElementById("adultCourtMaximum");
+
+const adultCourtSetting =
+  document.getElementById("adultCourtSetting");
+
+const adultOnlyStatus =
+  document.getElementById("adultOnlyStatus");
+
+const kidsOnlyMode = document.getElementById("kidsOnlyMode");
+const kidsOnlyStatus = document.getElementById("kidsOnlyStatus");
+const playerSearch = document.getElementById("playerSearch");
+const clearPlayerSearch = document.getElementById("clearPlayerSearch");
+
 let activeCategory =
   "All";
-
-
-let playerSearchQuery =
-  "";
 
 
 let presentPlayerIds =
@@ -64,6 +77,10 @@ let suggestionNumber = 0;
 
 let currentRoundApproved = false;
 
+let selectedMoveTeamId = null;
+const teamMoveStatus = document.getElementById("teamMoveStatus");
+const cancelTeamMove = document.getElementById("cancelTeamMove");
+
 let seenSuggestionSignatures =
   new Set();
 
@@ -88,18 +105,6 @@ const playerList =
 const playerSummary =
   document.getElementById(
     "playerSummary"
-  );
-
-
-const playerSearchInput =
-  document.getElementById(
-    "playerSearchInput"
-  );
-
-
-const clearPlayerSearch =
-  document.getElementById(
-    "clearPlayerSearch"
   );
 
 
@@ -310,6 +315,21 @@ function capitalizePlayerName(
     cleaned.toLocaleLowerCase();
 
 
+  /*
+    Capitalize letters at the beginning of:
+    - the complete name
+    - a new word
+    - a hyphenated name
+    - an apostrophe name
+    - a name in brackets
+
+    Examples:
+    john smith      -> John Smith
+    anna-maria      -> Anna-Maria
+    o'connor        -> O'Connor
+    alex (new)      -> Alex (New)
+  */
+
   return lowercase.replace(
     /(^|[\s\-'"(])([a-zà-öø-ÿ])/g,
     (
@@ -338,6 +358,14 @@ function normalizeName(
 
 
 
+/*
+  Duplicate names intentionally ignore category.
+
+  Alex in U14 and Alex in U18 are still two people
+  with the same display name, so the second player
+  needs a distinguishing name.
+*/
+
 function findPlayerWithSameName(
   name
 ) {
@@ -361,6 +389,15 @@ function findPlayerWithSameName(
 }
 
 
+
+/*
+  If the entered name already exists, ask the leader
+  for a distinguishing name immediately.
+
+  The dialog repeats until:
+  - a unique name is entered, or
+  - the leader cancels.
+*/
 
 function requestUniquePlayerName(
   initialName
@@ -642,6 +679,30 @@ function loadEveningSession() {
       approvedFormations.length +
       1;
 
+    if (stored.activeFormation && Array.isArray(stored.activeFormation.result?.teams) &&
+        approvedFormations.some(formation => formation.round === stored.activeFormation.round)) {
+      const active = stored.activeFormation;
+      currentResult = active.result;
+      const byId = new Map(currentResult.teams.map(team => [team.id, team]));
+      currentResult.courtGames.forEach(game => {
+        game.team1 = byId.get(game.team1.id);
+        game.team2 = byId.get(game.team2.id);
+        if (!game.team1 || !game.team2) throw new Error("Invalid saved court assignment");
+      });
+      currentResult.waitingTeams = currentResult.waitingTeams.map(team => byId.get(team.id));
+      currentRoundNumber = active.round;
+      currentRoundApproved = true;
+      currentResult.championshipMode = true;
+      presentPlayerIds = new Set(currentResult.teams.flatMap(team => team.players)
+        .concat(currentResult.rotationPlayers).map(player => player.id));
+      courts = active.settings.availableBaskets;
+      courtCount.textContent = courts;
+      document.getElementById("gameFormat").value = active.settings.requestedFormat;
+      kidsOnlyMode.checked = active.settings.kidsOnly;
+      adultOnlyMode.checked = active.settings.adultOnly;
+      adultCourtMaximum.value = String(active.settings.maxAdultCourts);
+    }
+
 
     renderEveningHistoryStatus();
 
@@ -656,6 +717,9 @@ function loadEveningSession() {
 
 
     approvedFormations = [];
+
+    currentResult = null;
+    currentRoundApproved = false;
 
     currentRoundNumber =
       1;
@@ -676,7 +740,12 @@ function saveEveningSession() {
     date:
       getTodayKey(),
 
-    approvedFormations
+    approvedFormations,
+    activeFormation: currentResult && currentRoundApproved ? {
+      round: currentRoundNumber,
+      result: currentResult,
+      settings: { availableBaskets: courts, requestedFormat: document.getElementById("gameFormat").value, ...adultOnlyOptions() }
+    } : null
 
   };
 
@@ -698,7 +767,81 @@ function saveEveningSession() {
 
 
 
+function latestCompletion() {
+  for (let i = approvedFormations.length - 1; i >= 0; i--) {
+    const formation = approvedFormations[i];
+    const completions = formation.completions || [];
+    for (let j = completions.length - 1; j >= 0; j--) {
+      if (!completions[j].undone) return { formation, completion: completions[j] };
+    }
+  }
+  return null;
+}
+
+function updateCompletionControls() {
+  const approved = Boolean(currentResult && currentRoundApproved && currentResult.courtGames.length);
+  document.getElementById("completeAllGames").disabled = !approved;
+  document.getElementById("undoLastCompletion").disabled = !latestCompletion();
+  const completed = (currentStoredFormation()?.completions || []).filter(completion => !completion.undone).length;
+  document.getElementById("gameCompletionStatus").textContent = approved
+    ? `${completed} shared ${completed === 1 ? "game" : "games"} completed with this formation. Each click counts all teams on court, including substitutes. Waiting teams do not receive a game.`
+    : "Approve the formation to record completed games for all courts.";
+}
+
+function completeAllGames() {
+  const formation = currentStoredFormation();
+  if (!formation || !currentResult.courtGames.length) return;
+  syncCurrentMatchups();
+  const matchupIndices = currentResult.courtGames.map(game => game.historyIndex);
+  if (new Set(matchupIndices).size !== matchupIndices.length ||
+      matchupIndices.some(index => !Number.isInteger(index) || !formation.matchups[index])) return;
+  matchupIndices.forEach(index => { formation.matchups[index].gamesPlayed = GameCounter.count(formation.matchups[index]) + 1; });
+  (formation.completions ||= []).push({ completedAt: new Date().toISOString(), matchupIndices });
+  saveEveningSession();
+  renderResult(currentResult, false);
+}
+
+function undoLastCompletion() {
+  const latest = latestCompletion();
+  if (!latest) return;
+  const { formation, completion } = latest;
+  const records = completion.matchupIndices.map(index => formation.matchups[index]);
+  if (records.some(record => !record || GameCounter.count(record) === 0)) return;
+  records.forEach(record => { record.gamesPlayed = GameCounter.count(record) - 1; });
+  completion.undone = true;
+  completion.undoneAt = new Date().toISOString();
+  saveEveningSession();
+  if (currentResult) renderResult(currentResult, false);
+}
+
+document.getElementById("completeAllGames").addEventListener("click", completeAllGames);
+document.getElementById("undoLastCompletion").addEventListener("click", undoLastCompletion);
+
+function renderGameCounter() {
+  const panel = document.getElementById("gameCounterPanel");
+  if (!panel) return;
+  const historyOpen = panel.querySelector("details")?.open || false;
+  const totals = GameCounter.totals(approvedFormations);
+  const names = new Map(players.map(player => [player.id, player.name]));
+  approvedFormations.forEach(formation => (formation.participants || []).forEach(player => {
+    if (!names.has(player.id)) names.set(player.id, player.name);
+  }));
+  const ids = new Set([...presentPlayerIds, ...totals.players.keys()]);
+  const entries = [...ids].map(id => ({ id, name: names.get(id) || id, count: totals.players.get(id) || 0 }))
+    .sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
+  const highest = Math.max(0, ...entries.filter(entry => presentPlayerIds.has(entry.id)).map(entry => entry.count));
+  panel.hidden = approvedFormations.length === 0;
+  panel.innerHTML = `<h2>Games played</h2>
+    <p>Use Game completed in Round controls once when all courts finish. All team members on court, including substitutes, receive a game. Waiting teams do not. Counts follow players when teams are remixed.</p>
+    <div class="participation-list">${entries.map(entry => `<span class="participation-player${presentPlayerIds.has(entry.id) && entry.count < highest ? " fewer-games" : ""}">${escapeHtml(entry.name)}: <strong>${entry.count}</strong>${presentPlayerIds.has(entry.id) && entry.count < highest ? " · fewer games" : ""}</span>`).join("")}</div>
+    <details ${historyOpen ? "open" : ""}><summary>Completed-game history</summary>
+    <p>Team letters refer to that formation only. Previous per-court counts are preserved. Undo last completion reverses the most recent shared completion, including after team moves.</p>
+    ${approvedFormations.map((formation, roundIndex) => (formation.matchups || []).map((game, gameIndex) =>
+      `<div class="game-history-row"><strong>Round ${escapeHtml(String(formation.round))} · Court ${escapeHtml(String(game.court || gameIndex + 1))} · ${escapeHtml(game.team1Name || "Team 1")} vs ${escapeHtml(game.team2Name || "Team 2")}</strong><p>${GameCounter.count(game)} completed</p></div>`).join("")).join("")}</details>`;
+}
+
 function renderEveningHistoryStatus() {
+  renderGameCounter();
 
   if (
     !eveningHistoryStatus
@@ -791,6 +934,8 @@ function startNewSession() {
   approvedFormations =
     [];
 
+  selectedMoveTeamId = null;
+
 
   presentPlayerIds =
     new Set();
@@ -820,20 +965,15 @@ function startNewSession() {
     "All";
 
 
-  playerSearchQuery =
-    "";
-
-
-  playerSearchInput.value =
-    "";
-
-
   resetAlternativeHistory();
 
 
   resultsSection.hidden =
     true;
 
+
+  playerSearch.value = "";
+  clearPlayerSearch.hidden = true;
 
   closeQuickAddForm();
 
@@ -1106,6 +1246,8 @@ async function loadPlayers() {
 
     renderPlayerInterface();
 
+    if (currentResult && currentRoundApproved) renderResult(currentResult, false);
+
   }
 
   catch (error) {
@@ -1154,112 +1296,36 @@ function sortPlayersByName(
 // ==================================================
 
 function getVisiblePlayers() {
+  const searchKey = name => normalizeName(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const query = searchKey(playerSearch.value);
+  return sortPlayersByName(players.filter(player =>
+    (activeCategory === "All" || player.category === activeCategory) &&
+    searchKey(player.name).includes(query)
+  ));
+}
 
-  let visible =
-    activeCategory ===
-    "All"
-      ? [...players]
-      : players.filter(
-          player =>
-            player.category ===
-            activeCategory
-        );
+playerSearch.addEventListener("input", () => {
+  clearPlayerSearch.hidden = !playerSearch.value;
+  renderPlayers();
+  updatePlayerSummary();
+});
 
+function resetPlayerSearch() {
+  playerSearch.value = "";
+  clearPlayerSearch.hidden = true;
+  renderPlayers();
+  updatePlayerSummary();
+  playerSearch.focus();
+}
 
-  const normalizedSearch =
-    normalizeName(
-      playerSearchQuery
-    );
+clearPlayerSearch.addEventListener("click", resetPlayerSearch);
 
-
-  if (
-    normalizedSearch
-  ) {
-
-    visible =
-      visible.filter(
-        player =>
-          normalizeName(
-            player.name
-          ).includes(
-            normalizedSearch
-          )
-      );
-
+playerSearch.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    resetPlayerSearch();
   }
-
-
-  return sortPlayersByName(
-    visible
-  );
-
-}
-
-
-
-// ==================================================
-// PLAYER SEARCH
-// ==================================================
-
-function updatePlayerSearchState() {
-
-  const hasSearch =
-    normalizeName(
-      playerSearchQuery
-    ).length > 0;
-
-
-  clearPlayerSearch.hidden =
-    !hasSearch;
-
-}
-
-
-
-playerSearchInput
-  .addEventListener(
-    "input",
-    () => {
-
-      playerSearchQuery =
-        playerSearchInput.value;
-
-
-      renderPlayers();
-
-      updatePlayerSummary();
-
-      updatePlayerSearchState();
-
-    }
-  );
-
-
-
-clearPlayerSearch
-  .addEventListener(
-    "click",
-    () => {
-
-      playerSearchQuery =
-        "";
-
-
-      playerSearchInput.value =
-        "";
-
-
-      renderPlayers();
-
-      updatePlayerSummary();
-
-      updatePlayerSearchState();
-
-
-      playerSearchInput.focus();
-
-    }
-  );
+});
 
 
 
@@ -1488,22 +1554,10 @@ function renderPlayers() {
     visiblePlayers.length === 0
   ) {
 
-    const hasSearch =
-      normalizeName(
-        playerSearchQuery
-      ).length > 0;
-
-
     playerList.innerHTML = `
 
       <div class="empty-player-list">
-
-        ${
-          hasSearch
-            ? "No players match your search."
-            : "No players in this category yet."
-        }
-
+        ${playerSearch.value.trim() ? "No players match your search in this category." : "No players in this category yet."}
       </div>
 
     `;
@@ -1519,37 +1573,21 @@ function renderPlayers() {
 // ==================================================
 
 function updatePlayerSummary() {
+  renderGameCounter();
 
   const visiblePlayers =
     getVisiblePlayers();
 
 
-  const hasSearch =
-    normalizeName(
-      playerSearchQuery
-    ).length > 0;
-
-
-  if (
-    hasSearch
-  ) {
-
-    playerSummary.textContent =
-      `${presentPlayerIds.size} of ${players.length} players present · ${visiblePlayers.length} matches`;
-
-  }
-
-  else {
-
-    playerSummary.textContent =
-      `${presentPlayerIds.size} of ${players.length} players present · ${visiblePlayers.length} shown`;
-
-  }
+  playerSummary.textContent =
+    `${presentPlayerIds.size} of ${players.length} players present · ${visiblePlayers.length} ${playerSearch.value.trim() ? (visiblePlayers.length === 1 ? "match" : "matches") : "shown"}`;
 
 
   updateSelectAllButton();
 
   updateNewSessionButtonState();
+
+  updateAdultOnlySettings();
 
 }
 
@@ -2094,6 +2132,14 @@ function addLocalPlayer() {
   }
 
 
+  /*
+    Check duplicate name across the complete roster,
+    regardless of category and letter case.
+
+    If a duplicate exists, ask for differentiation
+    instead of marking the existing person present.
+  */
+
   const uniqueName =
     requestUniquePlayerName(
       enteredName
@@ -2367,8 +2413,6 @@ function renderPlayerInterface() {
 
   updatePlayerSummary();
 
-  updatePlayerSearchState();
-
 }
 
 
@@ -2376,6 +2420,85 @@ function renderPlayerInterface() {
 // ==================================================
 // COURTS / FORMAT
 // ==================================================
+
+function updateAdultOnlySettings() {
+  const kidsCount = getPresentPlayers().filter(player => player.category === "Kids").length;
+  const kidsBasketReserved = kidsOnlyMode.checked && kidsCount >= 6;
+  kidsOnlyStatus.textContent = !kidsOnlyMode.checked
+    ? "Off: Kids are mixed into regular teams. Requires at least 6 selected Kids for a separate 3v3 basket."
+    : kidsCount < 6
+      ? `${kidsCount} selected Kids. At least 6 are needed for Kids-only 3v3; Kids will be mixed until then.`
+      : `One basket reserved for Kids-only 3v3. Extra Kids wait or rotate within the Kids group.${courts === 1 ? " Other teams will wait because no basket remains." : ""}`;
+  const previousMaximum =
+    Number(adultCourtMaximum.value) || 1;
+
+  const adultCount = getPresentPlayers().filter(
+    player => player.category === "18+"
+  ).length;
+
+  const formatPreference =
+    document.getElementById("gameFormat").value;
+
+  const adultPreference =
+    formatPreference === "4" && adultCount < 8
+      ? "3"
+      : formatPreference;
+
+  const usableAdultCourts = adultCount >= 6
+    ? TeamOptimizer.choosePlan(
+        adultCount,
+        Math.max(0, courts - (kidsBasketReserved ? 1 : 0)),
+        adultPreference
+      ).playableCourts
+    : 1;
+
+  const maximum = Math.max(
+    1,
+    Math.min(courts, usableAdultCourts)
+  );
+
+  adultCourtMaximum.replaceChildren();
+
+  for (let count = 1; count <= maximum; count++) {
+    const option = document.createElement("option");
+    option.value = String(count);
+    option.textContent = String(count);
+    adultCourtMaximum.appendChild(option);
+  }
+
+  adultCourtMaximum.value =
+    String(Math.min(previousMaximum, maximum));
+
+  adultCourtSetting.hidden = !adultOnlyMode.checked;
+
+  adultOnlyStatus.hidden =
+    !adultOnlyMode.checked || adultCount >= 6;
+
+  adultOnlyStatus.textContent =
+    `${adultCount} selected 18+ players. At least 6 are needed; normal mixing applies until then.`;
+}
+
+function adultOnlyOptions() {
+  return {
+    kidsOnly: kidsOnlyMode.checked,
+    adultOnly: adultOnlyMode.checked,
+    maxAdultCourts: Number(adultCourtMaximum.value) || 1
+  };
+}
+
+adultOnlyMode.addEventListener("change", () => {
+  updateAdultOnlySettings();
+  invalidateResults();
+});
+
+adultCourtMaximum.addEventListener("change", invalidateResults);
+
+kidsOnlyMode.addEventListener("change", () => {
+  updateAdultOnlySettings();
+  invalidateResults();
+});
+
+updateAdultOnlySettings();
 
 document
   .getElementById(
@@ -2391,6 +2514,7 @@ document
       courtCount.textContent =
         courts;
 
+      updateAdultOnlySettings();
 
       invalidateResults();
 
@@ -2417,6 +2541,7 @@ document
         courtCount.textContent =
           courts;
 
+        updateAdultOnlySettings();
 
         invalidateResults();
 
@@ -2433,7 +2558,10 @@ document
   )
   .addEventListener(
     "change",
-    invalidateResults
+    () => {
+      updateAdultOnlySettings();
+      invalidateResults();
+    }
   );
 
 
@@ -2468,6 +2596,7 @@ function resetAlternativeHistory() {
 // ==================================================
 
 function invalidateResults() {
+  selectedMoveTeamId = null;
 
   currentResult =
     null;
@@ -2499,6 +2628,8 @@ function invalidateResults() {
 
   updateNewSessionButtonState();
 
+  saveEveningSession();
+
 }
 
 
@@ -2506,6 +2637,152 @@ function invalidateResults() {
 // ==================================================
 // RESULT DISPLAY HELPERS
 // ==================================================
+
+function currentStoredFormation() {
+  return currentRoundApproved
+    ? approvedFormations.find(formation => formation.round === currentRoundNumber) : null;
+}
+
+function teamGroup(team) {
+  if (currentResult.plan.specialKidsCourt && team.players.every(player => player.category === "Kids")) return "Kids";
+  if (currentResult.plan.adultOnlyActive && team.players.every(player => player.category === "18+")) return "18+";
+  return "regular";
+}
+
+function canAssignSubstitute(player, team) {
+  if (team.players.length >= team.teamSize + 1) return false;
+  if (currentResult.plan.specialKidsCourt && (player.category === "Kids") !== (teamGroup(team) === "Kids")) return false;
+  if (currentResult.plan.adultOnlyActive && (player.category === "18+") !== (teamGroup(team) === "18+")) return false;
+  return true;
+}
+
+function matchupRecord(game) {
+  return {
+    court: game.court,
+    team1Id: game.team1.id, team2Id: game.team2.id,
+    team1Name: game.team1.name, team2Name: game.team2.name,
+    team1: game.team1.players.map(player => player.id),
+    team2: game.team2.players.map(player => player.id),
+    participatingPlayerIds: game.team1.players.concat(game.team2.players).map(player => player.id),
+    gamesPlayed: 0
+  };
+}
+
+// Keep every played matchup immutable. A changed assignment, roster or list
+// of participants starts a new counter instead of rewriting previous games.
+function syncCurrentMatchups() {
+  const formation = currentStoredFormation();
+  if (!formation) return;
+  formation.substitutePlayerIds = currentResult.teams.flatMap(team => team.substituteIds || []);
+  formation.rotationRoleIds = [...new Set([
+    ...(formation.rotationRoleIds || formation.rotation || []),
+    ...formation.substitutePlayerIds,
+    ...currentResult.rotationPlayers.map(player => player.id)
+  ])];
+  currentResult.courtGames.forEach((game, index) => {
+    const record = matchupRecord(game);
+    const previous = formation.matchups[game.historyIndex ?? index];
+    const sameIds = (a, b) => GameCounter.lineupKey(a || []) === GameCounter.lineupKey(b || []);
+    const same = previous && previous.court === record.court &&
+      sameIds(previous.team1, record.team1) && sameIds(previous.team2, record.team2) &&
+      sameIds(previous.participatingPlayerIds || previous.team1.concat(previous.team2), record.participatingPlayerIds);
+    if (same) {
+      game.historyIndex ??= index;
+      previous.team1Id = record.team1Id;
+      previous.team2Id = record.team2Id;
+    } else {
+      game.historyIndex = formation.matchups.length;
+      formation.matchups.push(record);
+    }
+  });
+}
+
+function finishTeamChange(message) {
+  selectedSwapPlayer = null;
+  selectedMoveTeamId = null;
+  currentResult.plan.individualRotation = currentResult.rotationPlayers.length;
+  currentResult.plan.assignedSubstitutes = currentResult.teams.reduce((sum, team) => sum + (team.substituteIds?.length || 0), 0);
+  currentResult.plan.waitingPlayers = currentResult.waitingTeams.reduce((sum, team) => sum + team.players.length, 0) + currentResult.rotationPlayers.length;
+  syncCurrentMatchups();
+  if (currentRoundApproved) saveEveningSession();
+  renderResult(currentResult, false);
+  teamMoveStatus.textContent = message;
+}
+
+function handleTeamMove(teamId) {
+  if (!currentResult || !findTeam(teamId)) return;
+  if (!selectedMoveTeamId) {
+    selectedMoveTeamId = teamId;
+    renderResult(currentResult, false);
+    return;
+  }
+  if (selectedMoveTeamId === teamId) {
+    selectedMoveTeamId = null;
+    renderResult(currentResult, false);
+    return;
+  }
+  const first = findTeam(selectedMoveTeamId);
+  const second = findTeam(teamId);
+  if (first.teamSize !== second.teamSize || teamGroup(first) !== teamGroup(second)) {
+    teamMoveStatus.textContent = "Choose a team from the same group and game format. Kids-only and adult-only groups stay separate.";
+    return;
+  }
+  const firstOnCourt = currentResult.courtGames.some(game => game.team1.id === first.id || game.team2.id === first.id);
+  const secondOnCourt = currentResult.courtGames.some(game => game.team1.id === second.id || game.team2.id === second.id);
+  if (!firstOnCourt && !secondOnCourt) {
+    teamMoveStatus.textContent = "Select a team on court to exchange with this waiting team.";
+    return;
+  }
+  const replace = team => team.id === first.id ? second : team.id === second.id ? first : team;
+  currentResult.courtGames.forEach(game => {
+    if ([game.team1.id, game.team2.id].some(id => id === first.id || id === second.id)) {
+      game.team1 = replace(game.team1);
+      game.team2 = replace(game.team2);
+    }
+  });
+  currentResult.waitingTeams = currentResult.waitingTeams.map(replace);
+  finishTeamChange(`Moved ${first.name} and ${second.name}. No game was added. Record the next game when it finishes.`);
+}
+
+function assignSubstitute(playerId, teamId) {
+  if (!currentResult) return;
+  const player = currentResult.rotationPlayers.find(player => player.id === playerId);
+  const team = findTeam(teamId);
+  if (!player || !team || !canAssignSubstitute(player, team)) return;
+  team.players.push(player);
+  team.substituteIds = [...(team.substituteIds || []), player.id];
+  currentResult.rotationPlayers = currentResult.rotationPlayers.filter(candidate => candidate.id !== player.id);
+  recalculateTeam(team);
+  finishTeamChange(`${player.name} joins ${team.name} as a substitute. The game stays ${team.teamSize}v${team.teamSize}.`);
+}
+
+function returnSubstitute(playerId, teamId) {
+  const team = findTeam(teamId);
+  if (!team?.substituteIds?.includes(playerId)) return;
+  const player = team.players.find(player => player.id === playerId);
+  team.players = team.players.filter(player => player.id !== playerId);
+  team.substituteIds = team.substituteIds.filter(id => id !== playerId);
+  currentResult.rotationPlayers.push(player);
+  recalculateTeam(team);
+  finishTeamChange(`${player.name} is back in unassigned rotation. Earlier game counts are unchanged.`);
+}
+
+cancelTeamMove.addEventListener("click", () => {
+  selectedMoveTeamId = null;
+  if (currentResult) renderResult(currentResult, false);
+});
+
+resultsSection.addEventListener("click", event => {
+  const move = event.target.closest("button[data-move-team]");
+  if (move) handleTeamMove(move.dataset.moveTeam);
+  const assign = event.target.closest("button[data-assign-substitute]");
+  if (assign) {
+    const select = document.getElementById(assign.dataset.selectId);
+    assignSubstitute(assign.dataset.assignSubstitute, select.value);
+  }
+  const release = event.target.closest("button[data-return-substitute]");
+  if (release) returnSubstitute(release.dataset.returnSubstitute, release.dataset.teamId);
+});
 
 function playerRow(
   player,
@@ -2549,6 +2826,10 @@ function playerRow(
           ${escapeHtml(player.category)}
         </span>
 
+        <span class="games-badge">${GameCounter.totals(approvedFormations).players.get(player.id) || 0} games played</span>
+
+        ${findTeam(teamId)?.substituteIds?.includes(player.id) ? '<span class="substitute-badge">Substitute</span>' : ""}
+
       </span>
 
       <span class="result-skill">
@@ -2568,6 +2849,16 @@ function playerRow(
 
 
 function teamCard(team) {
+  const counts = GameCounter.totals(approvedFormations);
+  const played = team.players.map(player => counts.players.get(player.id) || 0);
+  const minimum = Math.min(...played);
+  const maximum = Math.max(...played);
+  const lineupGames = counts.lineups.get(GameCounter.lineupKey(team.players.map(player => player.id))) || 0;
+  const formation = currentStoredFormation();
+  const teamGames = (formation?.matchups || []).filter(game => game.team1Id === team.id || game.team2Id === team.id)
+    .reduce((sum, game) => sum + GameCounter.count(game), 0);
+  const substituteControls = team.players.filter(player => team.substituteIds?.includes(player.id)).map(player =>
+    `<button type="button" class="secondary" data-return-substitute="${escapeHtml(player.id)}" data-team-id="${escapeHtml(team.id)}">Return ${escapeHtml(player.name)} to rotation</button>`).join("");
 
   const playersHtml =
     team.players
@@ -2583,7 +2874,7 @@ function teamCard(team) {
 
   return `
 
-    <div class="team-card">
+    <div class="team-card${selectedMoveTeamId === team.id ? " selected-move-team" : ""}">
 
       <div class="team-header">
 
@@ -2598,6 +2889,10 @@ function teamCard(team) {
       </div>
 
       ${playersHtml}
+
+      <p class="team-games">${team.teamSize} on court${team.substituteIds?.length ? " + 1 substitute" : ""} · Team: ${teamGames} games this formation · This lineup: ${lineupGames} games · Players: ${minimum === maximum ? minimum : `${minimum}–${maximum}`} games each</p>
+      <button type="button" class="secondary move-team-button" data-move-team="${escapeHtml(team.id)}" aria-pressed="${selectedMoveTeamId === team.id}">${selectedMoveTeamId === team.id ? "Selected — cancel" : selectedMoveTeamId ? "Exchange with selected team" : "Move team"}</button>
+      <div class="substitute-controls">${substituteControls}</div>
 
     </div>
 
@@ -2625,7 +2920,11 @@ function rotationPlayerRow(
       : "";
 
 
+  const eligible = currentResult.teams.filter(team => canAssignSubstitute(player, team));
+  const selectorId = `substituteTeam_${player.id}`;
   return `
+
+    <div class="rotation-assignment">
 
     <button
       type="button"
@@ -2645,6 +2944,8 @@ function rotationPlayerRow(
           ${escapeHtml(player.category)}
         </span>
 
+        <span class="games-badge">${GameCounter.totals(approvedFormations).players.get(player.id) || 0} games played</span>
+
       </span>
 
       <span class="result-skill">
@@ -2656,6 +2957,16 @@ function rotationPlayerRow(
       </span>
 
     </button>
+
+    <div class="substitute-assignment">
+      <label for="${escapeHtml(selectorId)}">Assign ${escapeHtml(player.name)} to</label>
+      <select id="${escapeHtml(selectorId)}" ${eligible.length ? "" : "disabled"}>
+        ${eligible.map(team => `<option value="${escapeHtml(team.id)}">${escapeHtml(team.name)} · Avg ${team.averageSkill.toFixed(1)}</option>`).join("")}
+      </select>
+      <button type="button" class="secondary" data-assign-substitute="${escapeHtml(player.id)}" data-select-id="${escapeHtml(selectorId)}" ${eligible.length ? "" : "disabled"}>Assign as substitute</button>
+      ${eligible.length ? "" : "<span>No compatible team has space for an extra player.</span>"}
+    </div>
+    </div>
 
   `;
 
@@ -2901,6 +3212,13 @@ function createStoredFormation(
 
   return {
 
+    substitutePlayerIds: result.teams.flatMap(team => team.substituteIds || []),
+    rotationRoleIds: [...new Set(result.rotationPlayers.map(player => player.id)
+      .concat(result.teams.flatMap(team => team.substituteIds || [])))],
+
+    participants: result.teams.flatMap(team => team.players).concat(result.rotationPlayers)
+      .map(player => ({ id: player.id, name: player.name })),
+
     round:
       currentRoundNumber,
 
@@ -2925,24 +3243,7 @@ function createStoredFormation(
           )
       ),
 
-    matchups:
-      result.courtGames.map(
-        game => ({
-
-          team1:
-            game.team1.players.map(
-              player =>
-                player.id
-            ),
-
-          team2:
-            game.team2.players.map(
-              player =>
-                player.id
-            )
-
-        })
-      ),
+    matchups: result.courtGames.map(matchupRecord),
 
     rotation:
       result.rotationPlayers.map(
@@ -3293,6 +3594,35 @@ function handlePlayerSwapClick(
   const secondPlayer =
     target.player;
 
+  // Substitute status belongs to a roster slot when players are exchanged.
+  const replaceSubstitute = (selection, outgoing, incoming) => {
+    if (selection.location === "team") {
+      selection.team.substituteIds = (selection.team.substituteIds || []).map(id => id === outgoing.id ? incoming.id : id);
+    }
+  };
+
+  if (
+    currentResult.plan.specialKidsCourt &&
+    (firstPlayer.category === "Kids") !== (secondPlayer.category === "Kids")
+  ) {
+    selectedSwapPlayer = null;
+    lastSwapMessage = "Kids can only be swapped with other Kids while the Kids-only basket is active.";
+    renderResult(currentResult, false);
+    return;
+  }
+
+  if (
+    currentResult.plan.adultOnlyActive &&
+    (firstPlayer.category === "18+") !==
+      (secondPlayer.category === "18+")
+  ) {
+    selectedSwapPlayer = null;
+    lastSwapMessage =
+      "18+ players can only be swapped with other 18+ players while adult-only games are active.";
+    renderResult(currentResult, false);
+    return;
+  }
+
 
   if (
     first.location === "team" &&
@@ -3373,6 +3703,8 @@ function handlePlayerSwapClick(
   }
 
 
+  replaceSubstitute(first, firstPlayer, secondPlayer);
+  replaceSubstitute(target, secondPlayer, firstPlayer);
   lastSwapMessage =
     `Swapped ${firstPlayer.name} and ${secondPlayer.name}.`;
 
@@ -3548,7 +3880,8 @@ async function generateInitialSuggestion(
         selectedPlayers,
         courts,
         formatPreference,
-        approvedFormations
+        approvedFormations,
+        adultOnlyOptions()
       );
 
 
@@ -3624,6 +3957,7 @@ async function generateInitialSuggestion(
 async function generateTeams(
   alternative = false
 ) {
+  selectedMoveTeamId = null;
 
   const selectedPlayers =
     getPresentPlayers();
@@ -3798,7 +4132,8 @@ async function generateTeams(
           selectedPlayers,
           courts,
           formatPreference,
-          approvedFormations
+          approvedFormations,
+          adultOnlyOptions()
         );
 
 
@@ -3942,11 +4277,11 @@ function approveCurrentFormation() {
   );
 
 
-  saveEveningSession();
-
-
   currentRoundApproved =
     true;
+
+  currentResult.courtGames.forEach((game, index) => { game.historyIndex = index; });
+  saveEveningSession();
 
 
   selectedSwapPlayer =
@@ -4057,6 +4392,7 @@ remixButton
 // ==================================================
 
 function updateRoundControls() {
+  updateCompletionControls();
 
   if (
     !currentResult
@@ -4092,7 +4428,7 @@ function updateRoundControls() {
 
 
     roundActionHelp.textContent =
-      `Round ${currentRoundNumber} is recorded as used. After the games, reset and remix for the next round.`;
+      `Formation ${currentRoundNumber} is approved. Record each game, then move teams manually. Reset & remix creates entirely new teams.`;
 
 
     return;
@@ -4148,6 +4484,8 @@ function updateRoundControls() {
 // RENDER RESULT
 // ==================================================
 
+
+
 function renderResult(
   result,
   shouldScroll = true
@@ -4155,6 +4493,14 @@ function renderResult(
 
   currentResult =
     result;
+
+  // Retain the old field for saved-session/report compatibility. Moving teams
+  // is now standard, including when an older session saved this as false.
+  result.championshipMode = true;
+  cancelTeamMove.hidden = !selectedMoveTeamId;
+  teamMoveStatus.textContent = selectedMoveTeamId
+    ? `${findTeam(selectedMoveTeamId)?.name || "Team"} selected. Now select the team to exchange it with, on court or waiting.`
+    : "Use Move team on two compatible teams to exchange their positions. Record games before moving teams.";
 
 
   const plan =
@@ -4169,6 +4515,11 @@ function renderResult(
         : "Mixed format"
     );
 
+  const assignedSubstitutes = result.teams.reduce((sum, team) => sum + (team.substituteIds?.length || 0), 0);
+  const autoRotationNote = document.getElementById("gameFormat").value === "auto" && assignedSubstitutes
+    ? `<div class="recommendation-note">${assignedSubstitutes} ${assignedSubstitutes === 1 ? "player assigned" : "players assigned"} to teams as substitutes for in-game rotation. You can return a substitute to rotation and assign them to another team. Substitute roles are shared across mixes when possible.</div>`
+    : "";
+
 
   let specialNote =
     "";
@@ -4182,8 +4533,8 @@ function renderResult(
 
       <div class="recommendation-note">
 
-        Kids court reserved as 3v3.
-        Younger players are added where needed.
+        One basket reserved for Kids-only 3v3.
+        Extra Kids wait or rotate within the Kids group.
 
       </div>
 
@@ -4194,6 +4545,10 @@ function renderResult(
 
   let historyNote =
     "";
+
+  const adultOnlyNote = plan.adultOnlyActive
+    ? `<div class="recommendation-note">18+ only vs 18+ · ${plan.adultCourtsUsed} adult ${plan.adultCourtsUsed === 1 ? "basket" : "baskets"} used.</div>`
+    : "";
 
 
   if (
@@ -4304,7 +4659,7 @@ function renderResult(
           </strong>
 
           <span>
-            rotating players
+            unassigned rotating players
           </span>
 
         </div>
@@ -4313,6 +4668,10 @@ function renderResult(
 
       ${specialNote}
 
+      ${autoRotationNote}
+
+      ${adultOnlyNote}
+
       ${historyNote}
 
       ${approvedNote}
@@ -4320,6 +4679,10 @@ function renderResult(
     `;
 
 
+
+  // ==================================================
+  // COURTS
+  // ==================================================
 
   const courtResults =
     document.getElementById(
@@ -4351,7 +4714,9 @@ function renderResult(
       const kidsLabel =
         game.specialKidsCourt
           ? " · Kids"
-          : "";
+          : game.adultOnly
+            ? " · 18+"
+            : "";
 
 
       court.innerHTML = `
@@ -4389,6 +4754,10 @@ function renderResult(
 
 
 
+  // ==================================================
+  // WAITING TEAMS
+  // ==================================================
+
   const waitingSection =
     document.getElementById(
       "waitingSection"
@@ -4416,9 +4785,7 @@ function renderResult(
 
 
     waitingTitle.textContent =
-      result.waitingTeams.length === 1
-        ? "Next team"
-        : "Next teams";
+      "Waiting teams — choose manually";
 
 
     waitingTeams.innerHTML =
@@ -4438,6 +4805,10 @@ function renderResult(
   }
 
 
+
+  // ==================================================
+  // ROTATION PLAYERS
+  // ==================================================
 
   const rotationSection =
     document.getElementById(

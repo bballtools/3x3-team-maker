@@ -46,7 +46,7 @@
     >
 
     <div class="unites-city">
-      Heerhugowaard
+      Den Haag
     </div>
 
   </div>
@@ -110,7 +110,7 @@
       <select id="gameFormat">
 
         <option value="auto">
-          Auto — prefer 3v3
+          Auto — reduce waiting
         </option>
 
         <option value="3">
@@ -124,6 +124,42 @@
       </select>
 
     </div>
+
+
+    <div class="setting-row adult-only-setting">
+      <label for="kidsOnlyMode">
+        <input id="kidsOnlyMode" type="checkbox" aria-describedby="kidsOnlyStatus">
+        Reserve one basket for Kids only
+      </label>
+    </div>
+    <p id="kidsOnlyStatus" class="setting-help" aria-live="polite">
+      Off: Kids are mixed into regular teams. Requires at least 6 selected Kids for a separate 3v3 basket.
+    </p>
+
+    <div class="setting-row adult-only-setting">
+
+      <label for="adultOnlyMode">
+        <input id="adultOnlyMode" type="checkbox">
+        18+ only vs 18+
+      </label>
+
+      <span class="setting-help">
+        Applies when at least 6 selected players are 18+.
+      </span>
+
+    </div>
+
+    <div id="adultCourtSetting" class="setting-row" hidden>
+
+      <label for="adultCourtMaximum">
+        Maximum baskets for 18+ games
+      </label>
+
+      <select id="adultCourtMaximum"></select>
+
+    </div>
+
+    <div id="adultOnlyStatus" class="setting-help" aria-live="polite" hidden></div>
 
 
     <div class="evening-session-row">
@@ -165,7 +201,7 @@
           Players
         </h2>
 
-        <p id="playerSummary">
+        <p id="playerSummary" role="status" aria-live="polite">
           Loading players...
         </p>
 
@@ -184,44 +220,15 @@
 
 
 
-    <!-- PLAYER SEARCH -->
-
-    <div class="player-search">
-
-      <span
-        class="player-search-icon"
-        aria-hidden="true"
-      >
-        🔎
-      </span>
-
-      <input
-        id="playerSearchInput"
-        class="player-search-input"
-        type="search"
-        placeholder="Search player..."
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="Search players"
-      >
-
-      <button
-        id="clearPlayerSearch"
-        class="clear-search-button"
-        type="button"
-        aria-label="Clear player search"
-        title="Clear search"
-        hidden
-      >
-        ×
-      </button>
-
+    <div
+      class="player-search" role="search" aria-label="Find players"
+    >
+      <span class="player-search-icon" aria-hidden="true">🔎</span>
+      <input id="playerSearch" type="search" placeholder="Search players…" aria-label="Search players by name" autocomplete="off" spellcheck="false" aria-controls="playerList">
+      <button id="clearPlayerSearch" type="button" class="player-search-clear" aria-label="Clear player search" title="Clear search" hidden>×</button>
     </div>
 
-
-
-    <div
-      id="categoryTabs"
+    <div id="categoryTabs"
       class="category-tabs"
     ></div>
 
@@ -435,10 +442,6 @@
 
 
 
-  <!-- ==================================================
-       GENERATE
-  =================================================== -->
-
   <button
     id="generateButton"
     class="generate"
@@ -453,6 +456,8 @@
        RESULTS
   =================================================== -->
 
+  <section id="gameCounterPanel" class="card game-counter-panel" hidden aria-label="Games played"></section>
+
   <section
     id="resultsSection"
     class="results-section"
@@ -466,6 +471,13 @@
     ></div>
 
 
+
+    <section class="card team-move-controls">
+      <h2>Move teams</h2>
+      <p>Keep the same teams. Record a completed game, then select “Move team” on a waiting team and on the team it replaces. You decide who stays after a win and who rests after two wins. Moving teams does not record a game.</p>
+      <p id="teamMoveStatus" role="status" aria-live="polite"></p>
+      <button id="cancelTeamMove" type="button" class="secondary" hidden>Cancel team move</button>
+    </section>
 
     <section class="card round-controls-card">
 
@@ -487,6 +499,9 @@
 
 
       <div class="round-buttons">
+
+        <button id="completeAllGames" type="button" class="approve-button" disabled>✓ Game completed — all courts</button>
+        <button id="undoLastCompletion" type="button" class="secondary" disabled>Undo last completion</button>
 
         <button
           id="alternativeButton"
@@ -516,6 +531,7 @@
         </button>
 
       </div>
+      <p id="gameCompletionStatus" role="status" aria-live="polite">Approve the formation to record completed games for all courts.</p>
 
     </section>
 
@@ -583,12 +599,12 @@
     >
 
       <h2>
-        Initial rotation
+        Unassigned rotating players
       </h2>
 
       <p class="explanation">
-        These players rotate into the games.
-        Tap a rotating player and then a team player to exchange them.
+        Use “Assign as substitute” to give a team one extra player for in-game rotation.
+        The number of players on court stays the same. Before approval, you can also tap two players to swap them.
       </p>
 
       <div id="rotationPlayers"></div>
@@ -604,6 +620,7 @@
 
 <script src="optimizer.js"></script>
 
+<script src="game-counter.js"></script>
 <script src="app.js"></script>
 
 
