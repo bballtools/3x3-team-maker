@@ -30,6 +30,13 @@ let localPlayers = [];
 
 let players = [];
 
+// Temporary guests belong to this evening, never to the permanent roster.
+let sessionDunkers = [];
+let dunkerCounter = 0;
+let kidsCourtSelection = null;
+let kidsDialogRequest = null;
+const kidsCourtDialog = document.getElementById("kidsCourtDialog");
+
 
 let courts = 2;
 
@@ -483,6 +490,7 @@ function requestUniquePlayerName(
 function skillBasketballs(
   skill
 ) {
+  if (!Number.isInteger(skill)) return '<span class="skill-unknown">Skill unknown</span>';
 
   const balls = [];
 
@@ -599,6 +607,10 @@ function updateNewSessionButtonState() {
 
 function loadEveningSession() {
 
+  sessionDunkers = [];
+  dunkerCounter = 0;
+  kidsCourtSelection = null;
+
   approvedFormations = [];
 
 
@@ -679,6 +691,13 @@ function loadEveningSession() {
       approvedFormations.length +
       1;
 
+    sessionDunkers = (Array.isArray(stored.sessionDunkers) ? stored.sessionDunkers : []).filter(player =>
+      player?.isPlaceholder === true && player.source === "session" && player.category === "Kids" &&
+      (player.skill === null || Number.isInteger(player.skill) && player.skill >= 1 && player.skill <= 5));
+    dunkerCounter = Math.max(Number.isSafeInteger(stored.dunkerCounter) ? stored.dunkerCounter : 0,
+      ...sessionDunkers.map(player => Number(player.name.match(/^Dunker (\d+)$/)?.[1]) || 0));
+    kidsCourtSelection = stored.kidsCourtSelection || null;
+
     if (stored.activeFormation && Array.isArray(stored.activeFormation.result?.teams) &&
         approvedFormations.some(formation => formation.round === stored.activeFormation.round)) {
       const active = stored.activeFormation;
@@ -720,6 +739,8 @@ function loadEveningSession() {
 
     currentResult = null;
     currentRoundApproved = false;
+    sessionDunkers = [];
+    kidsCourtSelection = null;
 
     currentRoundNumber =
       1;
@@ -741,6 +762,9 @@ function saveEveningSession() {
       getTodayKey(),
 
     approvedFormations,
+    sessionDunkers,
+    dunkerCounter,
+    kidsCourtSelection,
     activeFormation: currentResult && currentRoundApproved ? {
       round: currentRoundNumber,
       result: currentResult,
@@ -935,6 +959,10 @@ function startNewSession() {
     [];
 
   selectedMoveTeamId = null;
+  sessionDunkers = [];
+  dunkerCounter = 0;
+  kidsCourtSelection = null;
+  players = players.filter(player => !player.isPlaceholder);
 
 
   presentPlayerIds =
@@ -1184,7 +1212,8 @@ function mergePlayerSources() {
 
     ...masterPlayers,
 
-    ...localPlayers
+    ...localPlayers,
+    ...sessionDunkers
 
   ];
 
@@ -1453,7 +1482,7 @@ function renderPlayers() {
 
 
           const localBadge =
-            player.source ===
+            player.isPlaceholder ? '<span class="new-player-badge">Temporary guest</span>' : player.source ===
             "local"
               ? `
 
@@ -1519,7 +1548,7 @@ function renderPlayers() {
                 </div>
 
                 <div class="player-info">
-                  ${escapeHtml(player.category)}
+                  ${escapeHtml(player.isPlaceholder ? "Guest" : player.category)}
                 </div>
 
               </label>
@@ -2421,14 +2450,155 @@ function renderPlayerInterface() {
 // COURTS / FORMAT
 // ==================================================
 
+function selectedKidsGroupPlayers() {
+  const helpers = new Set(kidsCourtSelection?.u14Ids || []);
+  return getPresentPlayers().filter(player => player.category === "Kids" || player.category === "U14" && helpers.has(player.id));
+}
+
+function clearKidsGroup() {
+  const ids = new Set(sessionDunkers.map(player => player.id));
+  ids.forEach(id => presentPlayerIds.delete(id));
+  players = players.filter(player => !ids.has(player.id));
+  sessionDunkers = [];
+  kidsCourtSelection = null;
+}
+
+function finishKidsDialog(proceed) {
+  const request = kidsDialogRequest;
+  if (!request) return;
+  kidsDialogRequest = null;
+  kidsCourtDialog.close();
+  request.resolve(proceed);
+  document.getElementById("generateButton").focus();
+}
+
+function renderKidsCourtSlots() {
+  if (!kidsDialogRequest) return;
+  const slots = kidsDialogRequest.slots;
+  const u14Players = getPresentPlayers().filter(player => player.category === "U14");
+  document.getElementById("kidsCourtSlots").innerHTML = [0, 1].map(team =>
+    `<section><h3>Kids team ${team + 1}</h3>${slots.slice(team * 3, team * 3 + 3).map((player, localIndex) => {
+      const index = team * 3 + localIndex;
+      if (index < kidsDialogRequest.lockedCount) return `<div class="kids-group-slot"><strong>${escapeHtml(player.name)}</strong><span>Kids</span></div>`;
+      const available = u14Players.filter(candidate => !slots.some((slot, slotIndex) => slotIndex !== index && slot?.id === candidate.id));
+      return `<div class="kids-group-slot${player ? "" : " empty-kids-slot"}">
+        <label for="kidsHelper_${index}">Place ${localIndex + 1}</label>
+        <select id="kidsHelper_${index}" data-kids-slot="${index}">
+          <option value="">Empty place — choose a U14 player</option>
+          ${player?.isPlaceholder ? `<option value="${escapeHtml(player.id)}" selected>${escapeHtml(player.name)} · temporary guest</option>` : ""}
+          ${available.map(candidate => `<option value="${escapeHtml(candidate.id)}" ${candidate.id === player?.id ? "selected" : ""}>${escapeHtml(candidate.name)} · U14 · Skill ${candidate.skill}</option>`).join("")}
+        </select>
+        ${!player ? `<button type="button" class="secondary" data-add-dunker="${index}">Add Dunker</button>` : `<button type="button" class="secondary" data-remove-kids-helper="${index}">Clear place</button>`}
+      </div>`;
+    }).join("")}</section>`).join("");
+  const missing = slots.filter(player => !player).length;
+  document.getElementById("confirmKidsGroup").disabled = missing > 0;
+  document.getElementById("kidsCourtSetupStatus").textContent = missing
+    ? `${missing} ${missing === 1 ? "empty place" : "empty places"} to fill before continuing.`
+    : "All six places are filled. Other teams will use the remaining players.";
+}
+
+function showKidsCourtSetup() {
+  if (!kidsDialogRequest) return;
+  document.getElementById("kidsCourtChoice").hidden = true;
+  document.getElementById("kidsCourtSetup").hidden = false;
+  renderKidsCourtSlots();
+}
+
+function prepareKidsCourt(forceEdit = false) {
+  if (!kidsOnlyMode.checked) return Promise.resolve(true);
+  const kids = getPresentPlayers().filter(player => player.category === "Kids" && !player.isPlaceholder);
+  if (!forceEdit && (kids.length >= 6 || kidsCourtSelection?.confirmed && selectedKidsGroupPlayers().length >= 6)) return Promise.resolve(true);
+  if (kidsDialogRequest) return kidsDialogRequest.promise;
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  const locked = kids.slice(0, 6);
+  const helpers = selectedKidsGroupPlayers().filter(player => player.isPlaceholder || player.category === "U14");
+  const slots = [...locked, ...helpers].slice(0, 6);
+  while (slots.length < 6) slots.push(null);
+  kidsDialogRequest = { promise, resolve, slots, lockedCount: locked.length };
+  document.getElementById("kidsCourtChoice").hidden = forceEdit;
+  document.getElementById("kidsCourtSetup").hidden = !forceEdit;
+  document.getElementById("kidsCourtChoiceMessage").textContent = `${kids.length} Kids selected. Would you like a separate Kids basket with U14 helpers or temporary Dunkers, or mix the Kids into the other teams?`;
+  if (forceEdit) renderKidsCourtSlots();
+  kidsCourtDialog.showModal();
+  return promise;
+}
+
+function addDunkerToSlot(index) {
+  if (!kidsDialogRequest || index < kidsDialogRequest.lockedCount || index >= 6 || kidsDialogRequest.slots[index]) return;
+  const number = ++dunkerCounter;
+  kidsDialogRequest.slots[index] = {
+    id: `session-dunker-${getTodayKey()}-${number}`, name: `Dunker ${number}`,
+    category: "Kids", skill: null, source: "session", isPlaceholder: true
+  };
+  renderKidsCourtSlots();
+}
+
+function confirmKidsGroup() {
+  if (!kidsDialogRequest || kidsDialogRequest.slots.some(player => !player)) return;
+  const slots = kidsDialogRequest.slots;
+  const attending = new Set(getPresentPlayers().map(player => player.id));
+  if (new Set(slots.map(player => player.id)).size !== 6 || slots.some(player => !player.isPlaceholder && !attending.has(player.id))) {
+    document.getElementById("kidsCourtSetupStatus").textContent = "Attendance changed. Cancel and choose the Kids group again.";
+    return;
+  }
+  const previous = sessionDunkers.map(player => player.id);
+  sessionDunkers = slots.filter(player => player.isPlaceholder);
+  previous.filter(id => !sessionDunkers.some(player => player.id === id)).forEach(id => presentPlayerIds.delete(id));
+  players = players.filter(player => !player.isPlaceholder).concat(sessionDunkers);
+  sessionDunkers.forEach(player => presentPlayerIds.add(player.id));
+  kidsCourtSelection = { confirmed: true, u14Ids: slots.filter(player => player.category === "U14").map(player => player.id) };
+  invalidateResults();
+  renderPlayerInterface();
+  finishKidsDialog(true);
+}
+
+document.getElementById("keepKidsCourt").addEventListener("click", showKidsCourtSetup);
+document.getElementById("mixKidsCourt").addEventListener("click", () => {
+  kidsOnlyMode.checked = false;
+  clearKidsGroup();
+  invalidateResults();
+  renderPlayerInterface();
+  finishKidsDialog(true);
+});
+document.getElementById("cancelKidsCourt").addEventListener("click", () => finishKidsDialog(false));
+kidsCourtDialog.addEventListener("cancel", event => { event.preventDefault(); finishKidsDialog(false); });
+document.getElementById("confirmKidsGroup").addEventListener("click", confirmKidsGroup);
+document.getElementById("editKidsGroup").addEventListener("click", async () => {
+  if (await prepareKidsCourt(true)) await generateTeams(false);
+});
+document.getElementById("kidsCourtSlots").addEventListener("change", event => {
+  const select = event.target.closest("select[data-kids-slot]");
+  if (!select || !kidsDialogRequest) return;
+  const index = Number(select.dataset.kidsSlot);
+  if (index < kidsDialogRequest.lockedCount || index >= 6) return;
+  const current = kidsDialogRequest.slots[index];
+  kidsDialogRequest.slots[index] = current?.isPlaceholder && current.id === select.value ? current
+    : getPresentPlayers().find(player => player.category === "U14" && player.id === select.value) || null;
+  renderKidsCourtSlots();
+});
+document.getElementById("kidsCourtSlots").addEventListener("click", event => {
+  const add = event.target.closest("button[data-add-dunker]");
+  if (add) addDunkerToSlot(Number(add.dataset.addDunker));
+  const remove = event.target.closest("button[data-remove-kids-helper]");
+  if (remove && kidsDialogRequest) {
+    const index = Number(remove.dataset.removeKidsHelper);
+    if (index >= kidsDialogRequest.lockedCount && index < 6) kidsDialogRequest.slots[index] = null;
+    renderKidsCourtSlots();
+  }
+});
+
 function updateAdultOnlySettings() {
-  const kidsCount = getPresentPlayers().filter(player => player.category === "Kids").length;
-  const kidsBasketReserved = kidsOnlyMode.checked && kidsCount >= 6;
+  const kidsCount = getPresentPlayers().filter(player => player.category === "Kids" && !player.isPlaceholder).length;
+  const groupSize = selectedKidsGroupPlayers().length;
+  const kidsBasketReserved = kidsOnlyMode.checked && (kidsCount >= 6 || kidsCourtSelection?.confirmed && groupSize >= 6);
+  document.getElementById("editKidsGroup").hidden = !kidsOnlyMode.checked || kidsCount >= 6 && !kidsCourtSelection;
   kidsOnlyStatus.textContent = !kidsOnlyMode.checked
-    ? "Off: Kids are mixed into regular teams. Requires at least 6 selected Kids for a separate 3v3 basket."
-    : kidsCount < 6
-      ? `${kidsCount} selected Kids. At least 6 are needed for Kids-only 3v3; Kids will be mixed until then.`
-      : `One basket reserved for Kids-only 3v3. Extra Kids wait or rotate within the Kids group.${courts === 1 ? " Other teams will wait because no basket remains." : ""}`;
+    ? "Off: Kids are mixed into regular teams."
+    : !kidsBasketReserved
+      ? `${kidsCount} selected Kids. When creating teams, choose a separate Kids basket with U14 helpers or Dunkers, or mix the Kids into the other teams.`
+      : `One basket reserved for the selected Kids group as 3v3${kidsCourtSelection ? ", including its U14 helpers and Dunkers" : ""}. Extra group members wait or rotate within the group.${courts === 1 ? " Other teams will wait because no basket remains." : ""}`;
   const previousMaximum =
     Number(adultCourtMaximum.value) || 1;
 
@@ -2481,6 +2651,7 @@ function updateAdultOnlySettings() {
 function adultOnlyOptions() {
   return {
     kidsOnly: kidsOnlyMode.checked,
+    kidsGroupPlayerIds: kidsOnlyMode.checked ? selectedKidsGroupPlayers().map(player => player.id) : [],
     adultOnly: adultOnlyMode.checked,
     maxAdultCourts: Number(adultCourtMaximum.value) || 1
   };
@@ -2494,8 +2665,10 @@ adultOnlyMode.addEventListener("change", () => {
 adultCourtMaximum.addEventListener("change", invalidateResults);
 
 kidsOnlyMode.addEventListener("change", () => {
+  if (!kidsOnlyMode.checked) clearKidsGroup();
   updateAdultOnlySettings();
   invalidateResults();
+  renderPlayerInterface();
 });
 
 updateAdultOnlySettings();
@@ -2644,14 +2817,19 @@ function currentStoredFormation() {
 }
 
 function teamGroup(team) {
-  if (currentResult.plan.specialKidsCourt && team.players.every(player => player.category === "Kids")) return "Kids";
+  if (currentResult.plan.specialKidsCourt && (team.group === "Kids" || team.players.every(isKidsGroupPlayer))) return "Kids";
   if (currentResult.plan.adultOnlyActive && team.players.every(player => player.category === "18+")) return "18+";
   return "regular";
 }
 
+function isKidsGroupPlayer(player) {
+  return currentResult?.kidsGroupPlayerIds
+    ? currentResult.kidsGroupPlayerIds.includes(player.id) : player.category === "Kids";
+}
+
 function canAssignSubstitute(player, team) {
   if (team.players.length >= team.teamSize + 1) return false;
-  if (currentResult.plan.specialKidsCourt && (player.category === "Kids") !== (teamGroup(team) === "Kids")) return false;
+  if (currentResult.plan.specialKidsCourt && isKidsGroupPlayer(player) !== (teamGroup(team) === "Kids")) return false;
   if (currentResult.plan.adultOnlyActive && (player.category === "18+") !== (teamGroup(team) === "18+")) return false;
   return true;
 }
@@ -2784,6 +2962,20 @@ resultsSection.addEventListener("click", event => {
   if (release) returnSubstitute(release.dataset.returnSubstitute, release.dataset.teamId);
 });
 
+resultsSection.addEventListener("change", event => {
+  const select = event.target.closest("select[data-dunker-skill]");
+  if (!select || !currentResult) return;
+  const value = select.value === "" ? null : Number(select.value);
+  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 5)) return;
+  const id = select.dataset.dunkerSkill;
+  const copies = [...sessionDunkers, ...players, ...currentResult.teams.flatMap(team => team.players), ...currentResult.rotationPlayers];
+  copies.filter(player => player.id === id && player.isPlaceholder).forEach(player => { player.skill = value; });
+  currentResult.teams.filter(team => team.players.some(player => player.id === id)).forEach(recalculateTeam);
+  if (currentRoundApproved) saveEveningSession();
+  renderPlayers();
+  renderResult(currentResult, false);
+});
+
 function playerRow(
   player,
   teamId
@@ -2823,7 +3015,7 @@ function playerRow(
         </strong>
 
         <span class="category">
-          ${escapeHtml(player.category)}
+          ${escapeHtml(player.isPlaceholder ? "Guest · temporary" : player.category)}
         </span>
 
         <span class="games-badge">${GameCounter.totals(approvedFormations).players.get(player.id) || 0} games played</span>
@@ -2859,6 +3051,12 @@ function teamCard(team) {
     .reduce((sum, game) => sum + GameCounter.count(game), 0);
   const substituteControls = team.players.filter(player => team.substituteIds?.includes(player.id)).map(player =>
     `<button type="button" class="secondary" data-return-substitute="${escapeHtml(player.id)}" data-team-id="${escapeHtml(team.id)}">Return ${escapeHtml(player.name)} to rotation</button>`).join("");
+  const dunkerControls = team.players.filter(player => player.isPlaceholder).map(player =>
+    `<label class="dunker-rating">${escapeHtml(player.name)} skill
+      <select data-dunker-skill="${escapeHtml(player.id)}" aria-label="Skill for ${escapeHtml(player.name)}">
+        <option value="" ${player.skill === null ? "selected" : ""}>Unknown</option>
+        ${[1, 2, 3, 4, 5].map(skill => `<option value="${skill}" ${skill === player.skill ? "selected" : ""}>${skill}</option>`).join("")}
+      </select></label>`).join("");
 
   const playersHtml =
     team.players
@@ -2883,7 +3081,7 @@ function teamCard(team) {
         </strong>
 
         <span>
-          Avg ${team.averageSkill.toFixed(1)}
+          ${teamAverageLabel(team)}
         </span>
 
       </div>
@@ -2893,6 +3091,7 @@ function teamCard(team) {
       <p class="team-games">${team.teamSize} on court${team.substituteIds?.length ? " + 1 substitute" : ""} · Team: ${teamGames} games this formation · This lineup: ${lineupGames} games · Players: ${minimum === maximum ? minimum : `${minimum}–${maximum}`} games each</p>
       <button type="button" class="secondary move-team-button" data-move-team="${escapeHtml(team.id)}" aria-pressed="${selectedMoveTeamId === team.id}">${selectedMoveTeamId === team.id ? "Selected — cancel" : selectedMoveTeamId ? "Exchange with selected team" : "Move team"}</button>
       <div class="substitute-controls">${substituteControls}</div>
+      ${dunkerControls}
 
     </div>
 
@@ -2941,7 +3140,7 @@ function rotationPlayerRow(
         </strong>
 
         <span class="category">
-          ${escapeHtml(player.category)}
+          ${escapeHtml(player.isPlaceholder ? "Guest · temporary" : player.category)}
         </span>
 
         <span class="games-badge">${GameCounter.totals(approvedFormations).players.get(player.id) || 0} games played</span>
@@ -2961,7 +3160,7 @@ function rotationPlayerRow(
     <div class="substitute-assignment">
       <label for="${escapeHtml(selectorId)}">Assign ${escapeHtml(player.name)} to</label>
       <select id="${escapeHtml(selectorId)}" ${eligible.length ? "" : "disabled"}>
-        ${eligible.map(team => `<option value="${escapeHtml(team.id)}">${escapeHtml(team.name)} · Avg ${team.averageSkill.toFixed(1)}</option>`).join("")}
+        ${eligible.map(team => `<option value="${escapeHtml(team.id)}">${escapeHtml(team.name)} · ${teamAverageLabel(team)}</option>`).join("")}
       </select>
       <button type="button" class="secondary" data-assign-substitute="${escapeHtml(player.id)}" data-select-id="${escapeHtml(selectorId)}" ${eligible.length ? "" : "disabled"}>Assign as substitute</button>
       ${eligible.length ? "" : "<span>No compatible team has space for an extra player.</span>"}
@@ -2991,10 +3190,15 @@ function recalculateTeam(
     );
 
 
-  team.averageSkill =
-    team.totalSkill /
-    team.players.length;
+  const rated = team.players.filter(player => Number.isInteger(player.skill));
+  team.knownSkillCount = rated.length;
+  team.averageSkill = rated.length ? team.totalSkill / rated.length : null;
 
+}
+
+function teamAverageLabel(team) {
+  const unknown = team.players.filter(player => !Number.isInteger(player.skill)).length;
+  return `Avg ${team.averageSkill === null ? "—" : team.averageSkill.toFixed(1)}${unknown ? ` · ${unknown} unrated` : ""}`;
 }
 
 
@@ -3603,10 +3807,10 @@ function handlePlayerSwapClick(
 
   if (
     currentResult.plan.specialKidsCourt &&
-    (firstPlayer.category === "Kids") !== (secondPlayer.category === "Kids")
+    isKidsGroupPlayer(firstPlayer) !== isKidsGroupPlayer(secondPlayer)
   ) {
     selectedSwapPlayer = null;
-    lastSwapMessage = "Kids can only be swapped with other Kids while the Kids-only basket is active.";
+    lastSwapMessage = "Kids can only be swapped with other Kids-group members while the separate Kids basket is active.";
     renderResult(currentResult, false);
     return;
   }
@@ -3958,6 +4162,8 @@ async function generateTeams(
   alternative = false
 ) {
   selectedMoveTeamId = null;
+
+  if (!await prepareKidsCourt()) return;
 
   const selectedPlayers =
     getPresentPlayers();
@@ -4533,8 +4739,8 @@ function renderResult(
 
       <div class="recommendation-note">
 
-        One basket reserved for Kids-only 3v3.
-        Extra Kids wait or rotate within the Kids group.
+        One basket reserved for the selected Kids group as 3v3.
+        U14 helpers and temporary Dunkers stay in this group. Extra group members wait or rotate within the group.
 
       </div>
 

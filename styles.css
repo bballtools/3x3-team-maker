@@ -1960,3 +1960,18 @@ select {
 .substitute-assignment select { min-width: 0; max-width: 100%; padding: .5rem; }
 .rotation-assignment { padding-bottom: 1rem; }
 #gameCompletionStatus { margin: .8rem 0 0; color: #475569; font-size: .9rem; line-height: 1.45; }
+
+.kids-court-dialog { width: min(760px, calc(100% - 28px)); max-height: 90vh; overflow-y: auto; border: 0; border-radius: 14px; padding: 24px; color: #1f2937; }
+.kids-court-dialog::backdrop { background: rgb(15 23 42 / 60%); }
+.kids-court-dialog h2 { margin-top: 0; }
+.kids-court-dialog p { line-height: 1.5; }
+.kids-dialog-actions { display: flex; flex-wrap: wrap; gap: .7rem; }
+.kids-dialog-cancel { margin-top: 1rem; }
+.kids-court-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.kids-group-slot { min-height: 72px; display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .8rem; margin: .6rem 0; border: 1px solid #cbd5e1; border-radius: 8px; }
+.kids-group-slot select { width: 100%; min-width: 0; padding: .5rem; }
+.empty-kids-slot { background: #fff7ed; border-style: dashed; }
+.skill-unknown { font-size: .8rem; color: #64748b; white-space: nowrap; }
+.dunker-rating { display: inline-flex; align-items: center; gap: .5rem; margin: .7rem .7rem 0 0; font-size: .85rem; }
+.dunker-rating select { padding: .4rem; }
+@media (max-width: 520px) { .kids-court-slots { grid-template-columns: 1fr; } }

@@ -46,7 +46,7 @@
     >
 
     <div class="unites-city">
-      Heerhugowaard
+      Den Haag
     </div>
 
   </div>
@@ -133,8 +133,9 @@
       </label>
     </div>
     <p id="kidsOnlyStatus" class="setting-help" aria-live="polite">
-      Off: Kids are mixed into regular teams. Requires at least 6 selected Kids for a separate 3v3 basket.
+      Off: Kids are mixed into regular teams. With fewer than six Kids, you can choose U14 helpers or temporary Dunkers for a separate basket.
     </p>
+    <button id="editKidsGroup" type="button" class="secondary" hidden>Edit Kids group</button>
 
     <div class="setting-row adult-only-setting">
 
@@ -617,6 +618,25 @@
 
 </main>
 
+
+<dialog id="kidsCourtDialog" class="kids-court-dialog" aria-labelledby="kidsDialogTitle">
+  <h2 id="kidsDialogTitle">Set up the Kids basket</h2>
+  <div id="kidsCourtChoice">
+    <p id="kidsCourtChoiceMessage"></p>
+    <div class="kids-dialog-actions">
+      <button id="keepKidsCourt" type="button" class="approve-button">Keep a separate Kids basket</button>
+      <button id="mixKidsCourt" type="button" class="secondary">Mix Kids into the other teams</button>
+    </div>
+  </div>
+  <div id="kidsCourtSetup" hidden>
+    <p>Fill all six places with attending Kids, selected U14 helpers or Dunkers representing someone who will play. The two teams will be balanced after you finish.</p>
+    <p>Dunkers are temporary guests for this session. Set their skill on the team card when known; unknown ratings are left out of team averages.</p>
+    <div id="kidsCourtSlots" class="kids-court-slots"></div>
+    <p id="kidsCourtSetupStatus" role="status" aria-live="polite"></p>
+    <button id="confirmKidsGroup" type="button" class="approve-button" disabled>Use this Kids group</button>
+  </div>
+  <button id="cancelKidsCourt" type="button" class="secondary kids-dialog-cancel">Cancel</button>
+</dialog>
 
 <script src="optimizer.js"></script>
 

@@ -52,15 +52,12 @@
   }
 
   function sumSkill(players) {
-    return players.reduce((sum, player) => sum + player.skill, 0);
+    return players.reduce((sum, player) => sum + (Number.isInteger(player.skill) ? player.skill : 0), 0);
   }
 
   function averageSkill(players) {
-    if (players.length === 0) {
-      return 0;
-    }
-
-    return sumSkill(players) / players.length;
+    const rated = players.filter(player => Number.isInteger(player.skill));
+    return rated.length ? sumSkill(rated) / rated.length : null;
   }
 
   function averageAgeRank(players) {
@@ -1845,13 +1842,18 @@
   function createGloballyBalancedStructure(players, plan, historyStats) {
     const size = plan.teamSize;
     const count = players.length / size;
+    // Unknown Dunker ratings are neutral while searching; displayed averages
+    // use known ratings only and never treat an unknown player as zero skill.
+    const neutralSkill = averageSkill(players) ?? 3;
+    const rating = player => Number.isInteger(player.skill) ? player.skill : neutralSkill;
+    const allocationTotal = team => team.reduce((sum, player) => sum + rating(player), 0);
     const describe = team => {
       const ages = CATEGORY_ORDER.map(category =>
         team.filter(player => player.category === category).length);
       const skills = [1, 2, 3, 4, 5].map(skill =>
         team.filter(player => player.skill === skill).length);
       return {
-        total: sumSkill(team),
+        total: allocationTotal(team),
         composition: ages.reduce((sum, n) => sum + n * n, 0) * 2 +
           skills.reduce((sum, n) => sum + n * n, 0) +
           Math.max(0, skills[4] - 1) * 4,
@@ -1878,10 +1880,10 @@
     const started = Date.now();
     for (let attempt = 0; attempt < 16; attempt++) {
       const teams = Array.from({ length: count }, () => []);
-      const ordered = shuffle(players).sort((a, b) => b.skill - a.skill);
+      const ordered = shuffle(players).sort((a, b) => rating(b) - rating(a));
       ordered.forEach(player => {
         const available = shuffle(teams.filter(team => team.length < size));
-        available.sort((a, b) => sumSkill(a) - sumSkill(b) ||
+        available.sort((a, b) => allocationTotal(a) - allocationTotal(b) ||
           (describe([...a, player]).composition - describe(a).composition) -
           (describe([...b, player]).composition - describe(b).composition));
         available[0].push(player);
@@ -1920,8 +1922,8 @@
                 for (let k = i + 1; k < size; k++) {
                   for (let j = 0; j < size; j++) {
                     for (let l = j + 1; l < size; l++) {
-                      if (teams[a][i].skill + teams[a][k].skill !==
-                          teams[b][j].skill + teams[b][l].skill) continue;
+                      if (rating(teams[a][i]) + rating(teams[a][k]) !==
+                          rating(teams[b][j]) + rating(teams[b][l])) continue;
                       [teams[a][i], teams[b][j]] = [teams[b][j], teams[a][i]];
                       [teams[a][k], teams[b][l]] = [teams[b][l], teams[a][k]];
                       const sa = describe(teams[a]);
@@ -1999,8 +2001,9 @@
       totalSkill,
 
       averageSkill:
-        totalSkill /
-        players.length,
+        averageSkill(players),
+
+      knownSkillCount: players.filter(player => Number.isInteger(player.skill)).length,
 
       averageAgeRank:
         averageAgeRank(
@@ -2176,6 +2179,7 @@
         team.substituteIds = [player.id];
         team.totalSkill += player.skill;
         team.averageSkill = team.totalSkill / team.players.length;
+        team.knownSkillCount = team.players.length;
         team.averageAgeRank = averageAgeRank(team.players);
         rotationPlayers.splice(rotationPlayers.findIndex(candidate => candidate.id === player.id), 1);
       }
@@ -2450,10 +2454,13 @@
   // ==================================================
 
   function generateKidsOnlySession(selectedPlayers, courts, formatPreference, historyStats, options) {
-    const kids = selectedPlayers.filter(player => player.category === "Kids");
-    const others = selectedPlayers.filter(player => player.category !== "Kids");
+    const selectedIds = new Set(options.kidsGroupPlayerIds || []);
+    const kids = selectedPlayers.filter(player => player.category === "Kids" || selectedIds.has(player.id));
+    const kidsIds = new Set(kids.map(player => player.id));
+    const others = selectedPlayers.filter(player => !kidsIds.has(player.id));
     const kidsPlan = choosePlan(kids.length, 1, "3");
     const kidsResult = buildStandardSession(kids, kidsPlan, 0, 0, historyStats);
+    kidsResult.teams.forEach(team => { team.group = "Kids"; });
     kidsResult.courtGames.forEach(game => { game.specialKidsCourt = true; });
 
     let otherResult = null;
@@ -2496,7 +2503,8 @@
         waitingPlayers: waitingTeams.reduce((sum, team) => sum + team.players.length, 0) + rotationPlayers.length,
         unusedCourts: courts - courtGames.length
       },
-      teams, courtGames, waitingTeams, rotationPlayers
+      teams, courtGames, waitingTeams, rotationPlayers,
+      kidsGroupPlayerIds: [...kidsIds]
     };
   }
 
@@ -2641,7 +2649,8 @@
   function validateInputs(
     selectedPlayers,
     courts,
-    formatPreference
+    formatPreference,
+    options = {}
   ) {
     if (
       !Array.isArray(
@@ -2709,13 +2718,16 @@
           );
         }
 
-        if (
+        const unknownDunker = player.isPlaceholder === true && player.source === "session" &&
+          player.category === "Kids" && player.skill === null && options.kidsOnly === true &&
+          Array.isArray(options.kidsGroupPlayerIds) && options.kidsGroupPlayerIds.includes(player.id);
+        if (!unknownDunker && (
           !Number.isInteger(
             player.skill
           ) ||
           player.skill < 1 ||
           player.skill > 5
-        ) {
+        )) {
           throw new Error(
             `Invalid skill value for ${player.name}.`
           );
@@ -2752,8 +2764,19 @@
     validateInputs(
       selectedPlayers,
       courts,
-      formatPreference
+      formatPreference,
+      options
     );
+
+    if (options.kidsGroupPlayerIds !== undefined) {
+      if (!Array.isArray(options.kidsGroupPlayerIds) || new Set(options.kidsGroupPlayerIds).size !== options.kidsGroupPlayerIds.length) {
+        throw new Error("Invalid Kids-group selection.");
+      }
+      options.kidsGroupPlayerIds.forEach(id => {
+        const player = selectedPlayers.find(player => player.id === id);
+        if (!player || !["Kids", "U14"].includes(player.category)) throw new Error("Only selected Kids and U14 players may join the Kids group.");
+      });
+    }
 
     const historyStats =
       buildHistoryStats(
@@ -2764,7 +2787,7 @@
       player => player.category === "18+"
     ).length;
 
-    if (options.kidsOnly === true && selectedPlayers.filter(player => player.category === "Kids").length >= 6) {
+    if (options.kidsOnly === true && selectedPlayers.filter(player => player.category === "Kids" || options.kidsGroupPlayerIds?.includes(player.id)).length >= 6) {
       return generateKidsOnlySession(selectedPlayers, courts, formatPreference, historyStats, options);
     }
 
