@@ -178,6 +178,7 @@
       exactTeamCounts: new Map(),
       exactMatchupCounts: new Map(),
       rotationCounts: new Map(),
+      gamesPlayed: new Map(),
       lastRotationIds: new Set()
     };
 
@@ -220,6 +221,10 @@
       matchups.forEach(matchup => {
         const team1Ids = idsFromStoredTeam(matchup.team1);
         const team2Ids = idsFromStoredTeam(matchup.team2);
+        const completed = Number.isSafeInteger(matchup.gamesPlayed) && matchup.gamesPlayed > 0 ? matchup.gamesPlayed : 0;
+        const participants = Array.isArray(matchup.participatingPlayerIds)
+          ? matchup.participatingPlayerIds : team1Ids.concat(team2Ids);
+        new Set(participants).forEach(id => stats.gamesPlayed.set(id, (stats.gamesPlayed.get(id) || 0) + completed));
 
         if (team1Ids.length === 0 || team2Ids.length === 0) {
           return;
@@ -444,9 +449,9 @@
     // Restrict to the optimal history tiers before sampling so sampling can
     // never reselect a previous substitute when enough fresh players exist.
     const allPlayers = players;
-    const rank = player => [historyStats?.lastRotationIds.has(player.id) ? 1 : 0,
+    const rank = player => [-(historyStats?.gamesPlayed.get(player.id) || 0), historyStats?.lastRotationIds.has(player.id) ? 1 : 0,
       historyStats?.rotationCounts.get(player.id) || 0];
-    const compare = (a, b) => a[0] - b[0] || a[1] - b[1];
+    const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
     const ranked = [...players].sort((a, b) => compare(rank(a), rank(b)));
     const cutoff = rank(ranked[rotationCount - 1]);
     const mandatory = players.filter(player => compare(rank(player), cutoff) < 0);
@@ -723,25 +728,25 @@
     const elite1 =
       team1.filter(
         player =>
-          player.skill === 5
+          player.skill >= 9
       ).length;
 
     const elite2 =
       team2.filter(
         player =>
-          player.skill === 5
+          player.skill >= 9
       ).length;
 
     const strong1 =
       team1.filter(
         player =>
-          player.skill >= 4
+          player.skill >= 7
       ).length;
 
     const strong2 =
       team2.filter(
         player =>
-          player.skill >= 4
+          player.skill >= 7
       ).length;
 
     let score = 0;
@@ -972,11 +977,11 @@
               player.skill * 20;
 
             if (
-              player.skill === 5
+              player.skill >= 9
             ) {
               score += 250;
             } else if (
-              player.skill === 4
+              player.skill >= 7
             ) {
               score += 80;
             }
@@ -1126,7 +1131,7 @@
     const elite =
       players.filter(
         player =>
-          player.skill === 5
+          player.skill >= 9
       ).length;
 
     let score =
@@ -1840,23 +1845,33 @@
   // Optimize all regular teams together. Skill range and variance take
   // precedence over composition, which takes precedence over repeat history.
   function createGloballyBalancedStructure(players, plan, historyStats) {
+    const activeSlots = plan.playableCourts * 2 * plan.teamSize;
+    const countGames = player => historyStats?.gamesPlayed.get(player.id) || 0;
+    // Attendance constraints define each pool. Within it, court places go to
+    // the least-played players before skill balancing or teammate variety.
+    if (activeSlots > 0 && activeSlots < players.length && new Set(players.map(countGames)).size > 1) {
+      const ranked = shuffle(players).sort((a, b) => countGames(a) - countGames(b));
+      const active = createGloballyBalancedStructure(ranked.slice(0, activeSlots), plan, historyStats);
+      const waiting = createGloballyBalancedStructure(ranked.slice(activeSlots), { ...plan, playableCourts: 0 }, historyStats);
+      return { gameGroups: active.gameGroups, waitingGroups: waiting.waitingGroups };
+    }
     const size = plan.teamSize;
     const count = players.length / size;
     // Unknown Dunker ratings are neutral while searching; displayed averages
     // use known ratings only and never treat an unknown player as zero skill.
-    const neutralSkill = averageSkill(players) ?? 3;
+    const neutralSkill = averageSkill(players) ?? 6;
     const rating = player => Number.isInteger(player.skill) ? player.skill : neutralSkill;
     const allocationTotal = team => team.reduce((sum, player) => sum + rating(player), 0);
     const describe = team => {
       const ages = CATEGORY_ORDER.map(category =>
         team.filter(player => player.category === category).length);
-      const skills = [1, 2, 3, 4, 5].map(skill =>
+      const skills = Array.from({ length: 10 }, (_, i) => i + 1).map(skill =>
         team.filter(player => player.skill === skill).length);
       return {
         total: allocationTotal(team),
         composition: ages.reduce((sum, n) => sum + n * n, 0) * 2 +
           skills.reduce((sum, n) => sum + n * n, 0) +
-          Math.max(0, skills[4] - 1) * 4,
+          Math.max(0, skills[8] + skills[9] - 1) * 4,
         history: teamHistoryScore(team, historyStats)
       };
     };
@@ -2057,6 +2072,25 @@
     courtOffset,
     historyStats
   ) {
+    const basePlaces = plan.playableCourts * 2 * plan.teamSize;
+    const activeCapacity = basePlaces + Math.min(plan.individualRotation, plan.playableCourts * 2);
+    const gamesPlayed = player => historyStats?.gamesPlayed.get(player.id) || 0;
+    if (plan.autoAssignRotation && basePlaces > 0 && activeCapacity < players.length && new Set(players.map(gamesPlayed)).size > 1) {
+      const ranked = shuffle(players).sort((a, b) => gamesPlayed(a) - gamesPlayed(b));
+      const activePlayers = ranked.slice(0, activeCapacity);
+      const others = ranked.slice(activeCapacity);
+      const active = buildStandardSession(activePlayers, { ...plan, individualRotation:activePlayers.length % plan.teamSize,
+        completeTeams:plan.playableCourts*2, waitingTeams:0 }, teamIndexStart, courtOffset, historyStats);
+      const waiting = others.length >= plan.teamSize
+        ? buildStandardSession(others, { ...plan, playableCourts:0, teamsPlaying:0, completeTeams:Math.floor(others.length/plan.teamSize),
+          waitingTeams:Math.floor(others.length/plan.teamSize), individualRotation:others.length%plan.teamSize, autoAssignRotation:false }, active.nextTeamIndex, courtOffset, historyStats)
+        : {teams:[], courtGames:[], waitingTeams:[], rotationPlayers:others, nextTeamIndex:active.nextTeamIndex};
+      plan.individualRotation = active.rotationPlayers.length + waiting.rotationPlayers.length;
+      plan.assignedSubstitutes = active.teams.reduce((sum, team) => sum+(team.substituteIds?.length || 0),0);
+      plan.waitingPlayers = waiting.teams.reduce((sum, team) => sum+team.players.length,0) + plan.individualRotation;
+      return { teams:[...active.teams,...waiting.teams], courtGames:active.courtGames,
+        waitingTeams:waiting.waitingTeams, rotationPlayers:[...active.rotationPlayers,...waiting.rotationPlayers], nextTeamIndex:waiting.nextTeamIndex };
+    }
     const rotationPlayers =
       selectRotationPlayers(
         players,
@@ -2466,7 +2500,11 @@
     let otherResult = null;
     if (others.length >= 6) {
       const adultCount = others.filter(player => player.category === "18+").length;
-      if (options.adultOnly === true && adultCount >= 6) {
+      if (options.categoryMatchups?.length) {
+        otherResult = generateCategorySessions(others, courts - 1, formatPreference, historyStats, options.categoryMatchups);
+      } else if (options.categoryMatchup) {
+        otherResult = generateCategorySession(others, courts - 1, formatPreference, historyStats, options.categoryMatchup);
+      } else if (options.adultOnly === true && adultCount >= 6) {
         otherResult = generateAdultOnlySession(others, courts - 1, formatPreference,
           historyStats, Number.isInteger(options.maxAdultCourts) ? options.maxAdultCourts : 1);
       } else {
@@ -2492,6 +2530,11 @@
         specialKidsCourt: true,
         adultOnlyActive: Boolean(otherResult?.plan.adultOnlyActive),
         adultCourtsUsed: otherResult?.plan.adultCourtsUsed || 0,
+        categoryMatchupActive: Boolean(otherResult?.plan.categoryMatchupActive),
+        categoryMatchup: otherResult?.plan.categoryMatchup || null,
+        categoryMatchups: otherResult?.plan.categoryMatchups || [],
+        categoryCourtsUsed: otherResult?.plan.categoryCourtsUsed || 0,
+        categoryNotice: otherResult?.plan.categoryNotice || "",
         formatLabel: formats.join(" + "),
         mixedFormats: formats.length > 1,
         teamSize: formats.length === 1 ? 3 : null,
@@ -2506,6 +2549,146 @@
       teams, courtGames, waitingTeams, rotationPlayers,
       kidsGroupPlayerIds: [...kidsIds]
     };
+  }
+
+  function generateCategorySessions(selectedPlayers, courts, preference, historyStats, rules) {
+    const used = new Set();
+    let requested = 0;
+    for (const rule of rules) {
+      if (!rule || ![rule.category1,rule.category2].every(category => CATEGORY_ORDER.includes(category) && category !== "Kids")) throw new Error("Choose valid categories for every matchup.");
+      for (const category of new Set([rule.category1,rule.category2])) {
+        if (used.has(category)) throw new Error(`${category} is already used in another matchup. Use each category in one rule.`);
+        used.add(category);
+      }
+      if (!Number.isInteger(rule.maxCourts) || rule.maxCourts < 1) throw new Error("Choose at least one basket per matchup.");
+      requested += rule.maxCourts;
+    }
+    if (requested > courts) throw new Error(`Category matchups request ${requested} baskets, but only ${courts} remain after the Kids basket. Reduce the basket allocations or remove a matchup.`);
+    let remaining = [...selectedPlayers];
+    const parts = [], activeRules = [], notices = [];
+    let offset = 0;
+    for (const rule of rules) {
+      const pool = remaining.filter(player => [rule.category1,rule.category2].includes(player.category));
+      const count1 = pool.filter(player => player.category === rule.category1).length;
+      const count2 = pool.filter(player => player.category === rule.category2).length;
+      const eligible = rule.category1 === rule.category2 ? count1 >= 6 : count1 >= 3 && count2 >= 3;
+      if (!eligible) {
+        notices.push(`${rule.category1} vs ${rule.category2} needs ${rule.category1 === rule.category2 ? "6 players from that category" : "3 players per category"}; these players stay in the mixed group until then.`);
+        continue;
+      }
+      const part = generateCategorySession(pool, courts-offset, preference, historyStats, rule);
+      const ruleId = [...new Set([rule.category1,rule.category2])].sort().join("-");
+      part.teams.forEach(team => { team.categoryRuleId = ruleId; });
+      part.courtGames.forEach(game => { game.court += offset; game.categoryRuleId = ruleId; });
+      offset += part.courtGames.length;
+      parts.push(part);
+      activeRules.push({...rule, ruleId, courtsUsed:part.courtGames.length});
+      remaining = remaining.filter(player => !pool.includes(player));
+    }
+    const mixed = remaining.length >= 6
+      ? generateStandardSession(remaining, courts-offset, preference === "4" && remaining.length < 8 ? "3" : preference, historyStats)
+      : {teams:[],courtGames:[],waitingTeams:[],rotationPlayers:remaining};
+    mixed.courtGames.forEach(game => { game.court += offset; });
+    parts.push(mixed);
+    const teams = parts.flatMap(part=>part.teams);
+    teams.forEach((team,index)=>{team.id=`T${index+1}`;team.name=`Team ${teamLetter(index)}`;});
+    const courtGames=parts.flatMap(part=>part.courtGames), waitingTeams=parts.flatMap(part=>part.waitingTeams), rotationPlayers=parts.flatMap(part=>part.rotationPlayers);
+    const formats=[...new Set(teams.map(team=>`${team.teamSize} vs ${team.teamSize}`))];
+    return {teams,courtGames,waitingTeams,rotationPlayers,plan:{valid:true,specialKidsCourt:false,
+      categoryMatchupActive:activeRules.length>0,categoryMatchup:activeRules[0]||null,categoryMatchups:activeRules,
+      categoryCourtsUsed:offset,categoryNotice:notices.join(" "),adultOnlyActive:false,adultCourtsUsed:0,
+      formatLabel:formats.join(" + "),mixedFormats:formats.length>1,teamSize:formats.length===1?teams[0]?.teamSize:null,
+      completeTeams:teams.length,playableCourts:courtGames.length,waitingTeams:waitingTeams.length,individualRotation:rotationPlayers.length,
+      assignedSubstitutes:teams.reduce((sum,team)=>sum+(team.substituteIds?.length||0),0),
+      waitingPlayers:waitingTeams.reduce((sum,team)=>sum+team.players.length,0)+rotationPlayers.length,unusedCourts:courts-courtGames.length}};
+  }
+
+  function generateCategorySession(selectedPlayers, courts, preference, historyStats, rule) {
+    const { category1, category2 } = rule;
+    const allowed = CATEGORY_ORDER.filter(category => category !== "Kids");
+    if (!allowed.includes(category1) || !allowed.includes(category2)) throw new Error("Choose valid categories for the category matchup.");
+    const first = selectedPlayers.filter(player => player.category === category1);
+    const second = selectedPlayers.filter(player => player.category === category2);
+    const same = category1 === category2;
+    const eligible = same ? first.length >= 6 : first.length >= 3 && second.length >= 3;
+    if (!eligible || courts === 0) {
+      const result = generateStandardSession(selectedPlayers, courts, preference === "4" && selectedPlayers.length < 8 ? "3" : preference, historyStats);
+      result.plan.categoryNotice = !eligible
+        ? `${category1} vs ${category2} needs ${same ? `6 ${category1} players` : `at least 3 players in each category`}. The remaining players are mixed until then.`
+        : "The Kids basket uses the only available basket. Other players must wait.";
+      return result;
+    }
+    const cap = Math.min(courts, Math.max(1, Number.isInteger(rule.maxCourts) ? rule.maxCourts : 1));
+    let dedicated;
+    if (same) {
+      dedicated = generateStandardSession(first, cap, preference === "4" && first.length < 8 ? "3" : preference, historyStats);
+      dedicated.teams.forEach(team => { team.requiredCategory = category1; team.group = "category-matchup"; });
+    } else {
+      const formats = [3, 4].map(size => ({ size, count: Math.min(cap, Math.floor(first.length / size), Math.floor(second.length / size)) }))
+        .filter(format => format.count > 0);
+      let format = formats.find(format => format.size === Number(preference));
+      if (!format) format = preference === "auto"
+        ? formats.sort((a, b) => b.count * b.size - a.count * a.size || a.size - b.size)[0] : formats[0];
+      const size = format.size;
+      const side = (pool, courtCount = format.count) => {
+        if (pool.length < size) return {teams:[], rotation:pool};
+        const games = player => historyStats.gamesPlayed.get(player.id) || 0;
+        const capacity = courtCount * size + Math.min(pool.length % size, courtCount);
+        if (preference === "auto" && courtCount > 0 && capacity < pool.length && new Set(pool.map(games)).size > 1) {
+          const ranked = shuffle(pool).sort((a,b) => games(a)-games(b));
+          const active = side(ranked.slice(0,capacity),courtCount), waiting = side(ranked.slice(capacity),0);
+          return {teams:[...active.teams,...waiting.teams], rotation:[...active.rotation,...waiting.rotation]};
+        }
+        const rotation = selectRotationPlayers(pool, pool.length % size, historyStats);
+        const rotationIds = new Set(rotation.map(player => player.id));
+        let base = pool.filter(player => !rotationIds.has(player.id));
+        const slots = courtCount * size;
+        let groups;
+        if (new Set(base.map(games)).size > 1 && slots < base.length) {
+          base = shuffle(base).sort((a, b) => games(a) - games(b));
+          groups = [base.slice(0, slots), base.slice(slots)].flatMap(part =>
+            part.length ? createGloballyBalancedStructure(part, {teamSize:size, playableCourts:0}, historyStats).waitingGroups : []);
+        } else groups = createGloballyBalancedStructure(base, {teamSize:size, playableCourts:0}, historyStats).waitingGroups;
+        const teams = groups.map(group => ({ ...createTeamObject(group.players, "", ""), requiredCategory:pool[0].category, group:"category-matchup" }));
+        if (preference === "auto") for (const player of [...rotation]) {
+          const team = teams.find(team => team.players.length === size);
+          if (!team) break;
+          team.players.push(player);
+          team.substituteIds = [player.id];
+          team.totalSkill = sumSkill(team.players);
+          team.averageSkill = averageSkill(team.players);
+          team.knownSkillCount = team.players.filter(player => Number.isInteger(player.skill)).length;
+          rotation.splice(rotation.indexOf(player), 1);
+        }
+        return { teams, rotation };
+      };
+      const a = side(first), b = side(second);
+      dedicated = { teams:[...a.teams, ...b.teams],
+        courtGames:Array.from({length:format.count}, (_, i) => ({court:i+1, teamSize:size, team1:a.teams[i], team2:b.teams[i]})),
+        waitingTeams:[...a.teams.slice(format.count), ...b.teams.slice(format.count)],
+        rotationPlayers:[...a.rotation, ...b.rotation] };
+    }
+    dedicated.courtGames.forEach(game => Object.assign(game, {categoryMatchup:true, category1, category2}));
+    const others = selectedPlayers.filter(player => player.category !== category1 && player.category !== category2);
+    const remainingCourts = courts - dedicated.courtGames.length;
+    const mixed = others.length >= 6
+      ? generateStandardSession(others, remainingCourts, preference === "4" && others.length < 8 ? "3" : preference, historyStats)
+      : {teams:[], courtGames:[], waitingTeams:[], rotationPlayers:others};
+    mixed.courtGames.forEach(game => { game.court += dedicated.courtGames.length; });
+    const teams = [...dedicated.teams, ...mixed.teams];
+    teams.forEach((team, index) => { team.id = `T${index+1}`; team.name = `Team ${teamLetter(index)}`; });
+    const courtGames = [...dedicated.courtGames, ...mixed.courtGames];
+    const waitingTeams = [...dedicated.waitingTeams, ...mixed.waitingTeams];
+    const rotationPlayers = [...dedicated.rotationPlayers, ...mixed.rotationPlayers];
+    const formats = [...new Set(teams.map(team => `${team.teamSize} vs ${team.teamSize}`))];
+    return { plan:{valid:true, categoryMatchupActive:true, categoryMatchup:{category1,category2}, categoryCourtsUsed:dedicated.courtGames.length,
+      adultOnlyActive:same && category1 === "18+", adultCourtsUsed:same && category1 === "18+" ? dedicated.courtGames.length : 0,
+      specialKidsCourt:false, formatLabel:formats.join(" + "), mixedFormats:formats.length>1,
+      teamSize:formats.length === 1 ? teams[0].teamSize : null, completeTeams:teams.length, playableCourts:courtGames.length,
+      waitingTeams:waitingTeams.length, individualRotation:rotationPlayers.length,
+      assignedSubstitutes:teams.reduce((sum, team) => sum+(team.substituteIds?.length || 0),0),
+      waitingPlayers:waitingTeams.reduce((sum,team)=>sum+team.players.length,0)+rotationPlayers.length, unusedCourts:courts-courtGames.length},
+      teams,courtGames,waitingTeams,rotationPlayers };
   }
 
   function generateAdultOnlySession(
@@ -2726,7 +2909,7 @@
             player.skill
           ) ||
           player.skill < 1 ||
-          player.skill > 5
+          player.skill > 10
         )) {
           throw new Error(
             `Invalid skill value for ${player.name}.`
@@ -2790,6 +2973,9 @@
     if (options.kidsOnly === true && selectedPlayers.filter(player => player.category === "Kids" || options.kidsGroupPlayerIds?.includes(player.id)).length >= 6) {
       return generateKidsOnlySession(selectedPlayers, courts, formatPreference, historyStats, options);
     }
+
+    if (options.categoryMatchups?.length) return generateCategorySessions(selectedPlayers, courts, formatPreference, historyStats, options.categoryMatchups);
+    if (options.categoryMatchup) return generateCategorySession(selectedPlayers, courts, formatPreference, historyStats, options.categoryMatchup);
 
     if (options.adultOnly === true && adultCount >= 6) {
       const requestedMaximum = Number.isInteger(

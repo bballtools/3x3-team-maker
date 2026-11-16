@@ -12,7 +12,7 @@ const CATEGORY_ORDER = [
 
 
 const LOCAL_PLAYERS_KEY =
-  "bballtools_3x3_local_players_v1";
+  "bballtools_3x3_local_players_v2";
 
 
 const EVENING_SESSION_KEY =
@@ -25,6 +25,64 @@ const EVENING_SESSION_KEY =
 // ==================================================
 
 let masterPlayers = [];
+let scheduleText = "";
+let championshipPreview = null;
+let restoredCategoryCourtMaximum = null;
+let additionalCategoryRules = [];
+let skillOverrides = {};
+const SKILL_OVERRIDES_KEY = "bballtools_3x3_skill_overrides_v2";
+try { skillOverrides = JSON.parse(localStorage.getItem(SKILL_OVERRIDES_KEY) || "{}"); } catch { /* Start with roster ratings. */ }
+if (!skillOverrides || typeof skillOverrides !== "object" || Array.isArray(skillOverrides)) skillOverrides = {};
+
+// Convert saved 1–5 ratings once. Player IDs and historical counts stay intact.
+function migrateLegacySkills(value) {
+  if (!value || typeof value !== "object") return;
+  if (Number.isInteger(value.skill) && value.skill >= 1 && value.skill <= 5) value.skill *= 2;
+  Object.values(value).forEach(child => {
+    if (child && typeof child === "object") migrateLegacySkills(child);
+  });
+}
+
+function showPanel(name) {
+  const names = ["players", "setup", "teams", "schedule"];
+  if (!names.includes(name)) return;
+  names.forEach(item => {
+    const tab = document.getElementById(`tab-${item}`);
+    document.getElementById(`${item}Panel`).hidden = item !== name;
+    tab.setAttribute("aria-selected", String(item === name));
+    tab.tabIndex = item === name ? 0 : -1;
+  });
+  document.getElementById(`${name}Panel`).scrollIntoView({ block: "start", behavior: "instant" });
+}
+["players", "setup", "teams", "schedule"].forEach((name, index, names) => {
+  const tab = document.getElementById(`tab-${name}`);
+  tab.addEventListener("click", () => showPanel(name));
+  tab.addEventListener("keydown", event => {
+    let next;
+    if (event.key === "ArrowRight") next = names[(index + 1) % names.length];
+    if (event.key === "ArrowLeft") next = names[(index + names.length - 1) % names.length];
+    if (event.key === "Home") next = names[0];
+    if (event.key === "End") next = names[names.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    showPanel(next);
+    document.getElementById(`tab-${next}`).focus();
+  });
+});
+document.getElementById("scheduleNotes").addEventListener("input", event => {
+  scheduleText = event.target.value.slice(0, 20000);
+  saveEveningSession();
+  updateNewSessionButtonState();
+});
+document.getElementById("appendSchedule").addEventListener("click", () => {
+  if (!currentResult) return;
+  const lines = currentResult.courtGames.map(game =>
+    `Court ${game.court} · ${game.team1.name} vs ${game.team2.name} · ${game.teamSize}v${game.teamSize}`);
+  scheduleText = [scheduleText, `Formation ${currentRoundNumber}${currentRoundApproved ? "" : " (draft)"}`, ...lines].filter(Boolean).join("\n").slice(0, 20000);
+  document.getElementById("scheduleNotes").value = scheduleText;
+  saveEveningSession();
+  updateNewSessionButtonState();
+});
 
 let localPlayers = [];
 
@@ -42,6 +100,8 @@ let courts = 2;
 
 const adultOnlyMode =
   document.getElementById("adultOnlyMode");
+const matchupCategory1 = document.getElementById("matchupCategory1");
+const matchupCategory2 = document.getElementById("matchupCategory2");
 
 const adultCourtMaximum =
   document.getElementById("adultCourtMaximum");
@@ -65,7 +125,7 @@ let presentPlayerIds =
   new Set();
 
 
-let quickAddSkill = 3;
+let quickAddSkill = 6;
 
 
 let currentResult = null;
@@ -487,46 +547,9 @@ function requestUniquePlayerName(
 // SKILL DISPLAY
 // ==================================================
 
-function skillBasketballs(
-  skill
-) {
+function skillBasketballs(skill) {
   if (!Number.isInteger(skill)) return '<span class="skill-unknown">Skill unknown</span>';
-
-  const balls = [];
-
-
-  for (
-    let level = 1;
-    level <= 5;
-    level++
-  ) {
-
-    balls.push(`
-
-      <span
-        class="skill-ball ${level <= skill ? "active" : "inactive"}"
-        aria-hidden="true"
-      >
-        🏀
-      </span>
-
-    `);
-
-  }
-
-
-  return `
-
-    <span
-      class="skill-rating"
-      aria-label="Skill ${skill} out of 5"
-      title="Skill ${skill} out of 5"
-    >
-      ${balls.join("")}
-    </span>
-
-  `;
-
+  return `<span class="skill-rating numbered-ball" role="img" aria-label="Skill ${skill} out of 10" title="Skill ${skill} out of 10"><span aria-hidden="true">${skill}</span></span>`;
 }
 
 
@@ -590,7 +613,7 @@ function updateNewSessionButtonState() {
 
   const hasSessionState =
     approvedFormations.length > 0 ||
-    presentPlayerIds.size > 0 ||
+    presentPlayerIds.size > 0 || scheduleText.length > 0 ||
     currentResult !== null;
 
 
@@ -638,10 +661,8 @@ function loadEveningSession() {
     }
 
 
-    const stored =
-      JSON.parse(
-        raw
-      );
+    const stored = JSON.parse(raw);
+    if (stored && stored.skillScale !== 10) migrateLegacySkills(stored);
 
 
     if (
@@ -687,13 +708,14 @@ function loadEveningSession() {
     }
 
 
-    currentRoundNumber =
-      approvedFormations.length +
-      1;
+    scheduleText = typeof stored.scheduleText === "string" ? stored.scheduleText.slice(0, 20000) : "";
+    document.getElementById("scheduleNotes").value = scheduleText;
+    if (Array.isArray(stored.presentPlayerIds)) presentPlayerIds = new Set(stored.presentPlayerIds.filter(id => typeof id === "string"));
+    currentRoundNumber = approvedFormations.length + 1;
 
     sessionDunkers = (Array.isArray(stored.sessionDunkers) ? stored.sessionDunkers : []).filter(player =>
       player?.isPlaceholder === true && player.source === "session" && player.category === "Kids" &&
-      (player.skill === null || Number.isInteger(player.skill) && player.skill >= 1 && player.skill <= 5));
+      (player.skill === null || Number.isInteger(player.skill) && player.skill >= 1 && player.skill <= 10));
     dunkerCounter = Math.max(Number.isSafeInteger(stored.dunkerCounter) ? stored.dunkerCounter : 0,
       ...sessionDunkers.map(player => Number(player.name.match(/^Dunker (\d+)$/)?.[1]) || 0));
     kidsCourtSelection = stored.kidsCourtSelection || null;
@@ -710,16 +732,24 @@ function loadEveningSession() {
       });
       currentResult.waitingTeams = currentResult.waitingTeams.map(team => byId.get(team.id));
       currentRoundNumber = active.round;
+      suggestionNumber = Number.isSafeInteger(active.suggestionNumber) && active.suggestionNumber > 0 ? active.suggestionNumber : 1;
       currentRoundApproved = true;
       currentResult.championshipMode = true;
-      presentPlayerIds = new Set(currentResult.teams.flatMap(team => team.players)
+      if (!Array.isArray(stored.presentPlayerIds)) presentPlayerIds = new Set(currentResult.teams.flatMap(team => team.players)
         .concat(currentResult.rotationPlayers).map(player => player.id));
+      currentResult.teams.forEach(recalculateTeam);
       courts = active.settings.availableBaskets;
       courtCount.textContent = courts;
       document.getElementById("gameFormat").value = active.settings.requestedFormat;
       kidsOnlyMode.checked = active.settings.kidsOnly;
-      adultOnlyMode.checked = active.settings.adultOnly;
-      adultCourtMaximum.value = String(active.settings.maxAdultCourts);
+      const rules = active.settings.categoryMatchups;
+      const rule = rules?.[0] || active.settings.categoryMatchup;
+      additionalCategoryRules = Array.isArray(rules) ? rules.slice(1) : [];
+      adultOnlyMode.value = rule || active.settings.adultOnly ? "category" : "mixed";
+      matchupCategory1.value = rule?.category1 || "18+";
+      matchupCategory2.value = rule?.category2 || "18+";
+      restoredCategoryCourtMaximum = rule?.maxCourts || active.settings.maxAdultCourts || 1;
+      adultCourtMaximum.value = String(restoredCategoryCourtMaximum);
     }
 
 
@@ -761,12 +791,16 @@ function saveEveningSession() {
     date:
       getTodayKey(),
 
+    skillScale: 10,
+    scheduleText,
+    presentPlayerIds: [...presentPlayerIds],
     approvedFormations,
     sessionDunkers,
     dunkerCounter,
     kidsCourtSelection,
     activeFormation: currentResult && currentRoundApproved ? {
       round: currentRoundNumber,
+      suggestionNumber,
       result: currentResult,
       settings: { availableBaskets: courts, requestedFormat: document.getElementById("gameFormat").value, ...adultOnlyOptions() }
     } : null
@@ -786,6 +820,7 @@ function saveEveningSession() {
 
 
   renderEveningHistoryStatus();
+  renderAutomaticSchedule();
 
 }
 
@@ -804,23 +839,48 @@ function latestCompletion() {
 
 function updateCompletionControls() {
   const approved = Boolean(currentResult && currentRoundApproved && currentResult.courtGames.length);
-  document.getElementById("completeAllGames").disabled = !approved;
+  const pending = pendingGameCompletion();
+  const missing = approved ? currentResult.courtGames.filter(game => ![game.team1.id, game.team2.id].includes(game.winnerTeamId)).length : 0;
+  document.getElementById("completeAllGames").disabled = !approved || Boolean(pending) || missing > 0;
   document.getElementById("undoLastCompletion").disabled = !latestCompletion();
+  document.getElementById("nextGameControls").hidden = !pending;
+  updateChampionshipPairingHelp();
   const completed = (currentStoredFormation()?.completions || []).filter(completion => !completion.undone).length;
   document.getElementById("gameCompletionStatus").textContent = approved
-    ? `${completed} shared ${completed === 1 ? "game" : "games"} completed with this formation. Each click counts all teams on court, including substitutes. Waiting teams do not receive a game.`
+    ? pending ? `${completed} shared ${completed === 1 ? "game" : "games"} completed with this formation. Choose the next games below, or reset & remix.`
+      : missing ? `Select a winner on ${missing} ${missing === 1 ? "court" : "courts"}, then confirm Game completed — all courts.`
+      : `${completed} shared ${completed === 1 ? "game" : "games"} completed with this formation. Ready to record the winners and count all teams on court, including substitutes.`
     : "Approve the formation to record completed games for all courts.";
 }
 
-function completeAllGames() {
+function completeAllGames(confirmed = false) {
   const formation = currentStoredFormation();
-  if (!formation || !currentResult.courtGames.length) return;
+  if (!formation || !currentResult.courtGames.length || pendingGameCompletion()) return;
+  if (currentResult.courtGames.some(game => ![game.team1.id, game.team2.id].includes(game.winnerTeamId))) return;
+  if (!confirmed) {
+    document.getElementById("completedWinnerRecap").innerHTML = currentResult.courtGames.map(game =>
+      `<li>Court ${game.court} · ${escapeHtml(game.team1.name)} vs ${escapeHtml(game.team2.name)}<strong>Winner: ${escapeHtml(game.winnerTeamId === game.team1.id ? game.team1.name : game.team2.name)}</strong></li>`).join("");
+    document.getElementById("completionDialog").showModal();
+    return;
+  }
+  syncScheduledGames();
   syncCurrentMatchups();
   const matchupIndices = currentResult.courtGames.map(game => game.historyIndex);
   if (new Set(matchupIndices).size !== matchupIndices.length ||
       matchupIndices.some(index => !Number.isInteger(index) || !formation.matchups[index])) return;
   matchupIndices.forEach(index => { formation.matchups[index].gamesPlayed = GameCounter.count(formation.matchups[index]) + 1; });
-  (formation.completions ||= []).push({ completedAt: new Date().toISOString(), matchupIndices });
+  const results = currentResult.courtGames.map(game => ({
+    ...matchupRecord(game), teamSize: game.teamSize,
+    winnerTeamId: game.winnerTeamId,
+    winnerName: game.winnerTeamId === game.team1.id ? game.team1.name : game.team2.name,
+    loserTeamId: game.winnerTeamId === game.team1.id ? game.team2.id : game.team1.id
+  }));
+  (formation.completions ||= []).push({ completedAt: new Date().toISOString(), matchupIndices,
+    results, scheduleBatchNumber: currentResult.scheduleBatchNumber });
+  currentResult.pendingCompletionIndex = formation.completions.length - 1;
+  championshipPreview = null;
+  document.getElementById("championshipPairing").value = currentResult.waitingTeams.length ? "waiting-winners" : "results";
+  clearChampionshipPreview();
   saveEveningSession();
   renderResult(currentResult, false);
 }
@@ -834,17 +894,142 @@ function undoLastCompletion() {
   records.forEach(record => { record.gamesPlayed = GameCounter.count(record) - 1; });
   completion.undone = true;
   completion.undoneAt = new Date().toISOString();
+  if (formation === currentStoredFormation() && currentResult.scheduleBatchNumber === completion.scheduleBatchNumber) {
+    currentResult.pendingCompletionIndex = null;
+    currentResult.courtGames.forEach(game => { delete game.winnerTeamId; });
+  }
+  clearChampionshipPreview();
   saveEveningSession();
   if (currentResult) renderResult(currentResult, false);
 }
 
-document.getElementById("completeAllGames").addEventListener("click", completeAllGames);
+document.getElementById("completeAllGames").addEventListener("click", () => completeAllGames());
+document.getElementById("confirmGameCompletion").addEventListener("click", () => {
+  if (!document.getElementById("completionDialog").open) return;
+  document.getElementById("completionDialog").close();
+  completeAllGames(true);
+});
+document.getElementById("cancelGameCompletion").addEventListener("click", () => document.getElementById("completionDialog").close());
 document.getElementById("undoLastCompletion").addEventListener("click", undoLastCompletion);
+
+function pendingGameCompletion() {
+  const index = currentResult?.pendingCompletionIndex;
+  if (!Number.isInteger(index)) return null;
+  const completion = currentStoredFormation()?.completions?.[index];
+  return completion && !completion.undone ? completion : null;
+}
+
+function scheduleLayoutKey(games) {
+  return JSON.stringify(games.map(game => ({ court: game.court, teamSize: game.teamSize,
+    team1Id: game.team1Id ?? game.team1.id, team2Id: game.team2Id ?? game.team2.id,
+    team1: GameCounter.lineupKey(Array.isArray(game.team1) ? game.team1 : game.team1.players.map(player => player.id)),
+    team2: GameCounter.lineupKey(Array.isArray(game.team2) ? game.team2 : game.team2.players.map(player => player.id))
+  })).sort((a, b) => a.court - b.court));
+}
+
+function startScheduledGames(clearWinners = true) {
+  const formation = currentStoredFormation();
+  if (!formation) return;
+  const batches = formation.scheduleBatches ||= [];
+  currentResult.scheduleBatchNumber = batches.length + 1;
+  currentResult.pendingCompletionIndex = null;
+  if (clearWinners) currentResult.courtGames.forEach(game => { delete game.winnerTeamId; });
+  batches.push({ number: currentResult.scheduleBatchNumber, scheduledAt: new Date().toISOString(),
+    games: currentResult.courtGames.map(game => ({ ...matchupRecord(game), teamSize: game.teamSize })),
+    waitingNames: currentResult.waitingTeams.map(team => team.name) });
+  clearChampionshipPreview();
+}
+
+function syncScheduledGames() {
+  const formation = currentStoredFormation();
+  if (!formation) return;
+  const batch = formation.scheduleBatches?.find(item => item.number === currentResult.scheduleBatchNumber);
+  if (!batch) { startScheduledGames(false); return; }
+  if (scheduleLayoutKey(batch.games) === scheduleLayoutKey(currentResult.courtGames)) return;
+  const completed = formation.completions?.some(completion => !completion.undone && completion.scheduleBatchNumber === batch.number);
+  if (completed) { startScheduledGames(); return; }
+  currentResult.courtGames.forEach(game => { delete game.winnerTeamId; });
+  batch.games = currentResult.courtGames.map(game => ({ ...matchupRecord(game), teamSize: game.teamSize }));
+  batch.waitingNames = currentResult.waitingTeams.map(team => team.name);
+  clearChampionshipPreview();
+}
+
+function renderAutomaticSchedule() {
+  const batches = approvedFormations.flatMap(formation => (formation.scheduleBatches || []).map(batch => ({ formation, batch })));
+  document.getElementById("automaticSchedule").innerHTML = batches.length ? `<h3>Games &amp; results</h3>${batches.reverse().map(({ formation, batch }) => {
+    const completions = (formation.completions || []).filter(item => item.scheduleBatchNumber === batch.number);
+    const completed = completions.findLast(item => !item.undone);
+    const isCurrent = currentRoundApproved && formation.round === currentRoundNumber && currentResult?.scheduleBatchNumber === batch.number;
+    const status = completed ? "Completed" : completions.length ? "Completion undone" : isCurrent ? "Up next" : "Replaced before completion";
+    return `<section class="schedule-batch"><h4>Formation ${formation.round} · Game ${batch.number} <span>${status}</span></h4>
+      <p class="setting-help">${completed ? "Completed" : "Scheduled"} ${escapeHtml(new Date(completed?.completedAt || batch.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</p>
+      <ul>${batch.games.map(game => {
+        const outcome = completed?.results?.find(item => item.court === game.court);
+        return `<li><strong>Court ${game.court}</strong> · ${escapeHtml(game.team1Name)} vs ${escapeHtml(game.team2Name)} · ${game.teamSize}v${game.teamSize}${outcome ? `<span class="schedule-winner">Winner: ${escapeHtml(outcome.winnerName)}</span>` : ""}</li>`;
+      }).join("")}</ul>${batch.waitingNames?.length ? `<p class="setting-help">Waiting: ${batch.waitingNames.map(escapeHtml).join(", ")}</p>` : ""}</section>`;
+  }).join("")}` : '<p class="setting-help">Approve a formation to add its games here automatically.</p>';
+}
+
+function clearChampionshipPreview() {
+  championshipPreview = null;
+  document.getElementById("championshipPreview").hidden = true;
+  document.getElementById("startChampionship").hidden = true;
+}
+
+function previewChampionshipGames() {
+  const completion = pendingGameCompletion();
+  if (!completion) return;
+  championshipPreview = Championship.plan(currentResult, completion.results,
+    document.getElementById("championshipPairing").value, teamGroup);
+  const panel = document.getElementById("championshipPreview");
+  panel.hidden = false;
+  panel.innerHTML = `<h4>Review next games</h4><ul>${championshipPreview.games.map(game =>
+    `<li>Court ${game.court} · ${escapeHtml(game.team1.name)} vs ${escapeHtml(game.team2.name)} · ${game.teamSize}v${game.teamSize}</li>`).join("")}</ul>
+    <p>Waiting: ${championshipPreview.waitingTeams.length ? championshipPreview.waitingTeams.map(team => escapeHtml(team.name)).join(", ") : "No teams"}</p>
+    ${championshipPreview.mixedPairs ? '<p class="history-warning">The selected category rules or an uneven number of winners and losers require a mixed pairing to keep the courts in use.</p>' : ""}
+    <p class="setting-help">Team rosters stay together. Unassigned players remain in rotation. You can still move teams manually after starting.</p>`;
+  document.getElementById("startChampionship").hidden = false;
+}
+
+function startChampionshipGames() {
+  if (!pendingGameCompletion() || !championshipPreview) return;
+  currentResult.courtGames = championshipPreview.games;
+  currentResult.waitingTeams = championshipPreview.waitingTeams;
+  currentResult.plan.waitingTeams = currentResult.waitingTeams.length;
+  startScheduledGames();
+  finishTeamChange("Championship games are ready and added to Schedule. Select the winners when these games finish.");
+}
+
+document.getElementById("previewChampionship").addEventListener("click", previewChampionshipGames);
+document.getElementById("startChampionship").addEventListener("click", startChampionshipGames);
+function updateChampionshipPairingHelp() {
+  const mode = document.getElementById("championshipPairing").value;
+  document.getElementById("championshipPairingHelp").textContent = mode === "waiting-winners"
+    ? "Winners keep their court places. Waiting teams enter in queue order to face them; remaining games pair winners with winners and losers with losers where possible. Category rules still apply."
+    : mode === "waiting" ? "Waiting teams enter first to face losers. Winners rest as far as capacity allows. Category rules still apply."
+    : "Pair winners with winners and losers with losers. Waiting teams remain on the bench. Category rules still apply.";
+}
+document.getElementById("championshipPairing").addEventListener("change", () => {
+  clearChampionshipPreview();
+  updateChampionshipPairingHelp();
+});
+document.getElementById("nextRemix").addEventListener("click", () => remixForNextRound());
+
+resultsSection.addEventListener("change", event => {
+  const select = event.target.closest("select[data-court-winner]");
+  if (!select || !currentRoundApproved || pendingGameCompletion()) return;
+  const game = currentResult?.courtGames.find(game => String(game.court) === select.dataset.courtWinner);
+  if (!game || select.value && ![game.team1.id, game.team2.id].includes(select.value)) return;
+  game.winnerTeamId = select.value || null;
+  saveEveningSession();
+  updateCompletionControls();
+});
 
 function renderGameCounter() {
   const panel = document.getElementById("gameCounterPanel");
   if (!panel) return;
-  const historyOpen = panel.querySelector("details")?.open || false;
+  const gamesOpen = panel.querySelector(".games-played-details")?.open ?? true;
+  const historyOpen = panel.querySelector(".completed-game-history")?.open || false;
   const totals = GameCounter.totals(approvedFormations);
   const names = new Map(players.map(player => [player.id, player.name]));
   approvedFormations.forEach(formation => (formation.participants || []).forEach(player => {
@@ -855,13 +1040,14 @@ function renderGameCounter() {
     .sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
   const highest = Math.max(0, ...entries.filter(entry => presentPlayerIds.has(entry.id)).map(entry => entry.count));
   panel.hidden = approvedFormations.length === 0;
-  panel.innerHTML = `<h2>Games played</h2>
-    <p>Use Game completed in Round controls once when all courts finish. All team members on court, including substitutes, receive a game. Waiting teams do not. Counts follow players when teams are remixed.</p>
+  panel.innerHTML = `<details class="games-played-details" ${gamesOpen ? "open" : ""}>
+    <summary><h2>Games played</h2></summary>
+    <p>Select each court's winner, then use Game completed in Round controls once when all courts finish. All team members on court, including substitutes, receive a game. Waiting teams do not. Counts follow players when teams are remixed.</p>
     <div class="participation-list">${entries.map(entry => `<span class="participation-player${presentPlayerIds.has(entry.id) && entry.count < highest ? " fewer-games" : ""}">${escapeHtml(entry.name)}: <strong>${entry.count}</strong>${presentPlayerIds.has(entry.id) && entry.count < highest ? " · fewer games" : ""}</span>`).join("")}</div>
-    <details ${historyOpen ? "open" : ""}><summary>Completed-game history</summary>
+    <details class="completed-game-history" ${historyOpen ? "open" : ""}><summary>Completed-game history</summary>
     <p>Team letters refer to that formation only. Previous per-court counts are preserved. Undo last completion reverses the most recent shared completion, including after team moves.</p>
     ${approvedFormations.map((formation, roundIndex) => (formation.matchups || []).map((game, gameIndex) =>
-      `<div class="game-history-row"><strong>Round ${escapeHtml(String(formation.round))} · Court ${escapeHtml(String(game.court || gameIndex + 1))} · ${escapeHtml(game.team1Name || "Team 1")} vs ${escapeHtml(game.team2Name || "Team 2")}</strong><p>${GameCounter.count(game)} completed</p></div>`).join("")).join("")}</details>`;
+      `<div class="game-history-row"><strong>Round ${escapeHtml(String(formation.round))} · Court ${escapeHtml(String(game.court || gameIndex + 1))} · ${escapeHtml(game.team1Name || "Team 1")} vs ${escapeHtml(game.team2Name || "Team 2")}</strong><p>${GameCounter.count(game)} completed</p></div>`).join("")).join("")}</details></details>`;
 }
 
 function renderEveningHistoryStatus() {
@@ -917,10 +1103,11 @@ function renderEveningHistoryStatus() {
 // ==================================================
 
 function startNewSession() {
+  clearChampionshipPreview();
 
   const hasSessionState =
     approvedFormations.length > 0 ||
-    presentPlayerIds.size > 0 ||
+    presentPlayerIds.size > 0 || scheduleText.length > 0 ||
     currentResult !== null;
 
 
@@ -955,8 +1142,13 @@ function startNewSession() {
   );
 
 
-  approvedFormations =
-    [];
+  approvedFormations = [];
+  scheduleText = "";
+  document.getElementById("scheduleNotes").value = "";
+  document.getElementById("attendanceStatus").textContent = "";
+  document.getElementById("teamsEmpty").hidden = false;
+  document.getElementById("appendSchedule").disabled = true;
+  showPanel("players");
 
   selectedMoveTeamId = null;
   sessionDunkers = [];
@@ -1011,6 +1203,7 @@ function startNewSession() {
 
   renderPlayerInterface();
 
+  renderAutomaticSchedule();
 }
 
 
@@ -1049,9 +1242,10 @@ function loadLocalPlayers() {
 
   try {
 
+    const legacy = !localStorage.getItem(LOCAL_PLAYERS_KEY);
     const raw =
       localStorage.getItem(
-        LOCAL_PLAYERS_KEY
+        legacy ? "bballtools_3x3_local_players_v1" : LOCAL_PLAYERS_KEY
       );
 
 
@@ -1079,6 +1273,10 @@ function loadLocalPlayers() {
     }
 
 
+    if (legacy) {
+      migrateLegacySkills(parsed);
+      localStorage.setItem(LOCAL_PLAYERS_KEY, JSON.stringify(parsed));
+    }
     return parsed
       .filter(
         player =>
@@ -1092,7 +1290,7 @@ function loadLocalPlayers() {
             player.skill
           ) &&
           player.skill >= 1 &&
-          player.skill <= 5
+          player.skill <= 10
       )
       .map(
         player => ({
@@ -1216,6 +1414,10 @@ function mergePlayerSources() {
     ...sessionDunkers
 
   ];
+  players.forEach(player => {
+    const rating = skillOverrides[player.id];
+    if (!player.isPlaceholder && Number.isInteger(rating) && rating >= 1 && rating <= 10) player.skill = rating;
+  });
 
 }
 
@@ -1554,16 +1756,10 @@ function renderPlayers() {
               </label>
 
 
-              <label
-                class="skill"
-                for="${escapeHtml(checkboxId)}"
-              >
-
-                ${skillBasketballs(
-                  player.skill
-                )}
-
-              </label>
+              <div class="player-rating">
+                ${skillBasketballs(player.skill)}
+                ${player.isPlaceholder ? "" : `<select data-player-skill="${escapeHtml(player.id)}" aria-label="Skill for ${escapeHtml(player.name)}">${Array.from({length:10}, (_,i) => `<option value="${i+1}" ${player.skill === i+1 ? "selected" : ""}>${i+1}</option>`).join("")}</select>`}
+              </div>
 
 
               <div class="player-actions">
@@ -1603,6 +1799,7 @@ function renderPlayers() {
 
 function updatePlayerSummary() {
   renderGameCounter();
+  renderCheckedInOverview();
 
   const visiblePlayers =
     getVisiblePlayers();
@@ -1618,6 +1815,49 @@ function updatePlayerSummary() {
 
   updateAdultOnlySettings();
 
+}
+
+function renderCheckedInOverview() {
+  const selected = getPresentPlayers();
+  const rated = selected.filter(player => Number.isInteger(player.skill));
+  const unknown = selected.length - rated.length;
+  const average = rated.length
+    ? (rated.reduce((total, player) => total + player.skill, 0) / rated.length).toFixed(1)
+    : null;
+  document.getElementById("checkedInSummary").textContent = selected.length
+    ? `${selected.length} checked in · Average skill ${average === null ? "—" : `${average}/10`}${unknown ? ` · ${unknown} unrated` : ""}`
+    : "No players checked in yet. Select attending players above to see today's distribution.";
+
+  const groups = CATEGORY_ORDER.map(category => ({
+    category,
+    members: sortPlayersByName(selected.filter(player => player.category === category))
+  }));
+  document.getElementById("checkedInDistribution").innerHTML = groups.map(({ category, members }) => {
+    const percent = selected.length ? Math.round(members.length / selected.length * 100) : 0;
+    return `<div class="age-distribution-item">
+      <span>${escapeHtml(category)}</span><strong>${members.length}</strong>
+      <span class="age-distribution-bar" aria-hidden="true"><span style="width:${percent}%"></span></span>
+      <span class="distribution-percent">${percent}% of today</span>
+    </div>`;
+  }).join("");
+
+  document.getElementById("checkedInGroups").innerHTML = groups.map(({ category, members }) => {
+    const levels = [...new Set(members.map(player => player.skill))].sort((a, b) => {
+      if (a === null) return 1;
+      if (b === null) return -1;
+      return a - b;
+    });
+    return `<section class="checked-in-age" aria-label="${escapeHtml(category)} checked-in players">
+      <h3>${escapeHtml(category)} <span>${members.length} ${members.length === 1 ? "player" : "players"}</span></h3>
+      ${members.length ? levels.map(level => {
+        const matching = members.filter(player => player.skill === level);
+        return `<div class="checked-in-level">
+          <div class="checked-in-skill">${skillBasketballs(level)}<span>${matching.length} ${matching.length === 1 ? "player" : "players"}</span></div>
+          <ul class="checked-in-names">${matching.map(player => `<li>${escapeHtml(player.name)}${player.isPlaceholder ? '<span class="checked-in-guest">Guest</span>' : ""}</li>`).join("")}</ul>
+        </div>`;
+      }).join("") : '<p class="checked-in-empty">No players checked in.</p>'}
+    </section>`;
+  }).join("");
 }
 
 
@@ -1723,7 +1963,7 @@ document
       );
 
 
-      invalidateResults();
+      updateAttendanceResults();
 
 
       renderPlayerInterface();
@@ -1780,7 +2020,7 @@ playerList
       }
 
 
-      invalidateResults();
+      updateAttendanceResults();
 
 
       updatePlayerSummary();
@@ -2002,7 +2242,7 @@ function closeQuickAddForm() {
 
 
   quickAddSkill =
-    3;
+    6;
 
 
   renderSkillSelector();
@@ -2054,6 +2294,7 @@ function renderSkillSelector() {
           value ===
             quickAddSkill
         );
+        button.setAttribute("aria-pressed", String(value === quickAddSkill));
 
       }
     );
@@ -2235,7 +2476,7 @@ function addLocalPlayer() {
   );
 
 
-  invalidateResults();
+  updateAttendanceResults();
 
 
   closeQuickAddForm();
@@ -2599,27 +2840,30 @@ function updateAdultOnlySettings() {
     : !kidsBasketReserved
       ? `${kidsCount} selected Kids. When creating teams, choose a separate Kids basket with U14 helpers or Dunkers, or mix the Kids into the other teams.`
       : `One basket reserved for the selected Kids group as 3v3${kidsCourtSelection ? ", including its U14 helpers and Dunkers" : ""}. Extra group members wait or rotate within the group.${courts === 1 ? " Other teams will wait because no basket remains." : ""}`;
-  const previousMaximum =
-    Number(adultCourtMaximum.value) || 1;
+  const previousMaximum = restoredCategoryCourtMaximum || Number(adultCourtMaximum.value) || 1;
 
-  const adultCount = getPresentPlayers().filter(
-    player => player.category === "18+"
-  ).length;
+  const category1 = matchupCategory1.value || "18+";
+  const category2 = matchupCategory2.value || "18+";
+  const kidsIds = new Set(kidsBasketReserved ? selectedKidsGroupPlayers().map(player => player.id) : []);
+  const available = getPresentPlayers().filter(player => !kidsIds.has(player.id));
+  const count1 = available.filter(player => player.category === category1).length;
+  const count2 = available.filter(player => player.category === category2).length;
+  const eligible = category1 === category2 ? count1 >= 6 : count1 >= 3 && count2 >= 3;
 
   const formatPreference =
     document.getElementById("gameFormat").value;
 
   const adultPreference =
-    formatPreference === "4" && adultCount < 8
+    formatPreference === "4" && count1 < 8
       ? "3"
       : formatPreference;
 
-  const usableAdultCourts = adultCount >= 6
-    ? TeamOptimizer.choosePlan(
-        adultCount,
+  const usableAdultCourts = eligible
+    ? category1 === category2 ? TeamOptimizer.choosePlan(
+        count1,
         Math.max(0, courts - (kidsBasketReserved ? 1 : 0)),
         adultPreference
-      ).playableCourts
+      ).playableCourts : Math.min(Math.floor(count1 / 3), Math.floor(count2 / 3), Math.max(0, courts - (kidsBasketReserved ? 1 : 0)))
     : 1;
 
   const maximum = Math.max(
@@ -2638,24 +2882,85 @@ function updateAdultOnlySettings() {
 
   adultCourtMaximum.value =
     String(Math.min(previousMaximum, maximum));
+  if (players.length) restoredCategoryCourtMaximum = null;
 
-  adultCourtSetting.hidden = !adultOnlyMode.checked;
+  const enabled = categoryMatchupEnabled();
+  document.getElementById("categoryMatchupSetting").hidden = !enabled;
+  adultCourtSetting.hidden = !enabled;
+  adultOnlyStatus.hidden = !enabled;
+  adultOnlyStatus.textContent = !eligible
+    ? `${category1}: ${count1}${category1 !== category2 ? ` · ${category2}: ${count2}` : ""} checked in. ${category1 === category2 ? `At least 6 ${category1} players are needed` : "At least 3 in each category are needed"}; the remaining players are mixed until then.`
+    : usableAdultCourts === 0 ? "No basket remains after reserving the Kids basket. Other players must wait."
+    : `${category1} vs ${category2} is available. ${category1}: ${count1}${category1 !== category2 ? ` · ${category2}: ${count2}` : ""} checked in. Everyone else is mixed; fewer-game priority applies within each group.`;
+  renderAdditionalCategoryRules();
+}
 
-  adultOnlyStatus.hidden =
-    !adultOnlyMode.checked || adultCount >= 6;
-
-  adultOnlyStatus.textContent =
-    `${adultCount} selected 18+ players. At least 6 are needed; normal mixing applies until then.`;
+function categoryMatchupEnabled() {
+  return adultOnlyMode.value === "category";
 }
 
 function adultOnlyOptions() {
+  const enabled = categoryMatchupEnabled();
+  const category1 = matchupCategory1.value || "18+";
+  const category2 = matchupCategory2.value || "18+";
   return {
     kidsOnly: kidsOnlyMode.checked,
     kidsGroupPlayerIds: kidsOnlyMode.checked ? selectedKidsGroupPlayers().map(player => player.id) : [],
-    adultOnly: adultOnlyMode.checked,
+    categoryMatchup: enabled ? { category1, category2, maxCourts: Number(adultCourtMaximum.value) || 1 } : null,
+    categoryMatchups: enabled ? [{category1,category2,maxCourts:Number(adultCourtMaximum.value)||1},...additionalCategoryRules.map(rule=>({...rule}))] : [],
+    adultOnly: enabled && category1 === "18+" && category2 === "18+",
     maxAdultCourts: Number(adultCourtMaximum.value) || 1
   };
 }
+
+function renderAdditionalCategoryRules() {
+  const enabled=categoryMatchupEnabled();
+  document.getElementById("extraMatchupSettings").hidden=!enabled;
+  const categories=CATEGORY_ORDER.filter(category=>category!=="Kids");
+  const options=selected=>categories.map(category=>`<option value="${escapeHtml(category)}" ${category===selected?"selected":""}>${escapeHtml(category)}</option>`).join("");
+  const available=getPresentPlayers().filter(player=>!kidsOnlyMode.checked || !selectedKidsGroupPlayers().some(member=>member.id===player.id));
+  document.getElementById("additionalCategoryRules").innerHTML=additionalCategoryRules.map((rule,index)=>{
+    const first=available.filter(player=>player.category===rule.category1).length,second=available.filter(player=>player.category===rule.category2).length;
+    const eligible=rule.category1===rule.category2?first>=6:first>=3&&second>=3;
+    return `<section class="category-matchup-setting extra-category-rule"><h3>Matchup ${index+2}</h3>
+      <div class="setting-row"><label for="ruleFirst${index}">First category</label><select id="ruleFirst${index}" data-rule-index="${index}" data-rule-field="category1">${options(rule.category1)}</select></div>
+      <div class="setting-row"><label for="ruleSecond${index}">Plays against</label><select id="ruleSecond${index}" data-rule-index="${index}" data-rule-field="category2">${options(rule.category2)}</select></div>
+      <div class="setting-row"><label for="ruleBaskets${index}">Maximum baskets</label><select id="ruleBaskets${index}" data-rule-index="${index}" data-rule-field="maxCourts">${Array.from({length:Math.max(courts,rule.maxCourts)},(_,i)=>`<option value="${i+1}" ${rule.maxCourts===i+1?"selected":""}>${i+1}</option>`).join("")}</select></div>
+      <p class="setting-help">${escapeHtml(rule.category1)}: ${first}${rule.category1===rule.category2?"":` · ${escapeHtml(rule.category2)}: ${second}`} checked in. ${eligible?"Ready.":rule.category1===rule.category2?"Needs at least 6 players; mixed until then.":"Needs at least 3 per category; mixed until then."}</p>
+      <button type="button" class="secondary" data-remove-rule="${index}">Remove matchup ${index+2}</button></section>`;
+  }).join("");
+  const rules=adultOnlyOptions().categoryMatchups, used=new Set(),duplicates=new Set();
+  rules.forEach(rule=>new Set([rule.category1,rule.category2]).forEach(category=>{if(used.has(category))duplicates.add(category);used.add(category);}));
+  const reserved=kidsOnlyMode.checked?1:0;
+  const requested=rules.reduce((sum,rule)=>sum+rule.maxCourts,0);
+  document.getElementById("categoryBasketBudget").textContent=duplicates.size
+    ? `Each category can appear in one matchup. Already used: ${[...duplicates].join(", ")}.`
+    : requested+reserved>courts?`You allocated ${requested+reserved} baskets, including Kids, but only ${courts} are available. Reduce basket allocations or remove a matchup.`
+    : `${reserved} Kids basket · ${requested} category ${requested===1?"basket":"baskets"} · ${courts-reserved-requested} baskets left for mixed games. Each category can appear in one matchup.`;
+  document.getElementById("addCategoryRule").disabled=used.size>=categories.length;
+}
+
+document.getElementById("addCategoryRule").addEventListener("click",()=>{
+  const used=new Set(adultOnlyOptions().categoryMatchups.flatMap(rule=>[rule.category1,rule.category2]));
+  const category=CATEGORY_ORDER.find(category=>category!=="Kids"&&!used.has(category));
+  if(!category)return;
+  additionalCategoryRules.push({category1:category,category2:category,maxCourts:1});
+  updateAdultOnlySettings();invalidateResults();
+});
+document.getElementById("additionalCategoryRules").addEventListener("change",event=>{
+  const select=event.target.closest("select[data-rule-index]");
+  if(!select)return;
+  const rule=additionalCategoryRules[Number(select.dataset.ruleIndex)],field=select.dataset.ruleField;
+  if(!rule||!["category1","category2","maxCourts"].includes(field))return;
+  rule[field]=field==="maxCourts"?Number(select.value):select.value;
+  updateAdultOnlySettings();invalidateResults();
+});
+document.getElementById("additionalCategoryRules").addEventListener("click",event=>{
+  const button=event.target.closest("button[data-remove-rule]");
+  if(!button)return;
+  additionalCategoryRules.splice(Number(button.dataset.removeRule),1);
+  updateAdultOnlySettings();invalidateResults();
+});
 
 adultOnlyMode.addEventListener("change", () => {
   updateAdultOnlySettings();
@@ -2663,6 +2968,10 @@ adultOnlyMode.addEventListener("change", () => {
 });
 
 adultCourtMaximum.addEventListener("change", invalidateResults);
+[matchupCategory1, matchupCategory2].forEach(select => select.addEventListener("change", () => {
+  updateAdultOnlySettings();
+  invalidateResults();
+}));
 
 kidsOnlyMode.addEventListener("change", () => {
   if (!kidsOnlyMode.checked) clearKidsGroup();
@@ -2768,7 +3077,54 @@ function resetAlternativeHistory() {
 // INVALIDATE CURRENT RESULT
 // ==================================================
 
+function updateAttendanceResults() {
+  document.getElementById("attendanceStatus").textContent = "";
+  if (!currentResult || !currentRoundApproved) { invalidateResults(); return; }
+  // Keep approved rosters fixed until the leader remixes. Unassigned arrivals
+  // can be checked in or out without changing any court or completion record.
+  let restored = false;
+  const rosterIds = new Set(currentResult.teams.flatMap(team => team.players.map(player => player.id)));
+  rosterIds.forEach(id => { if (!presentPlayerIds.has(id)) { presentPlayerIds.add(id); restored = true; } });
+  currentResult.rotationPlayers = players.filter(player => presentPlayerIds.has(player.id) && !rosterIds.has(player.id));
+  finishTeamChange("Attendance updated. Assign late arrivals as substitutes or include them after the game with Reset & remix.");
+  document.getElementById("attendanceStatus").textContent = restored
+    ? "Players assigned to approved teams stay selected. Record the game, then reset & remix to change team attendance."
+    : "Approved teams stay in place. Late arrivals are in unassigned rotation on Teams & games.";
+  renderPlayerInterface();
+}
+
+document.getElementById("editNextAttendance").addEventListener("click", () => {
+  if (!currentResult || !currentRoundApproved) return;
+  if (!window.confirm("Record any completed game first. Then close this court layout and change attendance for the next teams? Earlier game counts and approved formations will stay saved.")) return;
+  invalidateResults();
+  showPanel("players");
+  document.getElementById("attendanceStatus").textContent = "Update attendance, then create and review the next teams. Earlier game counts are saved.";
+});
+
+playerList.addEventListener("change", event => {
+  const select = event.target.closest("select[data-player-skill]");
+  if (!select) return;
+  const rating = Number(select.value);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 10) return;
+  const id = select.dataset.playerSkill;
+  skillOverrides[id] = rating;
+  localStorage.setItem(SKILL_OVERRIDES_KEY, JSON.stringify(skillOverrides));
+  const copies = [...players, ...masterPlayers, ...localPlayers,
+    ...(currentResult ? [...currentResult.teams.flatMap(team => team.players), ...currentResult.rotationPlayers] : [])];
+  copies.filter(player => player.id === id).forEach(player => { player.skill = rating; });
+  if (currentResult && currentRoundApproved) {
+    currentResult.teams.forEach(recalculateTeam);
+    saveEveningSession();
+    renderResult(currentResult, false);
+  } else invalidateResults();
+  renderPlayers();
+  renderCheckedInOverview();
+});
+
 function invalidateResults() {
+  clearChampionshipPreview();
+  document.getElementById("teamsEmpty").hidden = false;
+  document.getElementById("appendSchedule").disabled = true;
   selectedMoveTeamId = null;
 
   currentResult =
@@ -2818,6 +3174,8 @@ function currentStoredFormation() {
 
 function teamGroup(team) {
   if (currentResult.plan.specialKidsCourt && (team.group === "Kids" || team.players.every(isKidsGroupPlayer))) return "Kids";
+  if (team.categoryRuleId) return `category-matchup:${team.categoryRuleId}`;
+  if (team.group === "category-matchup") return "category-matchup";
   if (currentResult.plan.adultOnlyActive && team.players.every(player => player.category === "18+")) return "18+";
   return "regular";
 }
@@ -2829,7 +3187,16 @@ function isKidsGroupPlayer(player) {
 
 function canAssignSubstitute(player, team) {
   if (team.players.length >= team.teamSize + 1) return false;
+  return playerCompatibleWithTeam(player, team);
+}
+
+function playerCompatibleWithTeam(player, team) {
   if (currentResult.plan.specialKidsCourt && isKidsGroupPlayer(player) !== (teamGroup(team) === "Kids")) return false;
+  if (currentResult.plan.categoryMatchupActive && teamGroup(team) !== "Kids") {
+    if (team.requiredCategory) return player.category === team.requiredCategory;
+    const rules = currentResult.plan.categoryMatchups?.length ? currentResult.plan.categoryMatchups : [currentResult.plan.categoryMatchup];
+    return !rules.some(rule=>player.category===rule.category1||player.category===rule.category2);
+  }
   if (currentResult.plan.adultOnlyActive && (player.category === "18+") !== (teamGroup(team) === "18+")) return false;
   return true;
 }
@@ -2882,6 +3249,7 @@ function finishTeamChange(message) {
   currentResult.plan.assignedSubstitutes = currentResult.teams.reduce((sum, team) => sum + (team.substituteIds?.length || 0), 0);
   currentResult.plan.waitingPlayers = currentResult.waitingTeams.reduce((sum, team) => sum + team.players.length, 0) + currentResult.rotationPlayers.length;
   syncCurrentMatchups();
+  syncScheduledGames();
   if (currentRoundApproved) saveEveningSession();
   renderResult(currentResult, false);
   teamMoveStatus.textContent = message;
@@ -2902,7 +3270,7 @@ function handleTeamMove(teamId) {
   const first = findTeam(selectedMoveTeamId);
   const second = findTeam(teamId);
   if (first.teamSize !== second.teamSize || teamGroup(first) !== teamGroup(second)) {
-    teamMoveStatus.textContent = "Choose a team from the same group and game format. Kids-only and adult-only groups stay separate.";
+    teamMoveStatus.textContent = "Choose a team from the same group and game format. Kids and category matchups stay separate.";
     return;
   }
   const firstOnCourt = currentResult.courtGames.some(game => game.team1.id === first.id || game.team2.id === first.id);
@@ -2912,6 +3280,11 @@ function handleTeamMove(teamId) {
     return;
   }
   const replace = team => team.id === first.id ? second : team.id === second.id ? first : team;
+  if (currentResult.courtGames.some(game => game.categoryMatchup && game.category1 !== game.category2 &&
+      replace(game.team1).requiredCategory === replace(game.team2).requiredCategory)) {
+    teamMoveStatus.textContent = "This move would break the selected category matchup. Exchange teams from the same category, or swap the two teams on one court.";
+    return;
+  }
   currentResult.courtGames.forEach(game => {
     if ([game.team1.id, game.team2.id].some(id => id === first.id || id === second.id)) {
       game.team1 = replace(game.team1);
@@ -2966,13 +3339,14 @@ resultsSection.addEventListener("change", event => {
   const select = event.target.closest("select[data-dunker-skill]");
   if (!select || !currentResult) return;
   const value = select.value === "" ? null : Number(select.value);
-  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 5)) return;
+  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 10)) return;
   const id = select.dataset.dunkerSkill;
   const copies = [...sessionDunkers, ...players, ...currentResult.teams.flatMap(team => team.players), ...currentResult.rotationPlayers];
   copies.filter(player => player.id === id && player.isPlaceholder).forEach(player => { player.skill = value; });
   currentResult.teams.filter(team => team.players.some(player => player.id === id)).forEach(recalculateTeam);
   if (currentRoundApproved) saveEveningSession();
   renderPlayers();
+  renderCheckedInOverview();
   renderResult(currentResult, false);
 });
 
@@ -3055,7 +3429,7 @@ function teamCard(team) {
     `<label class="dunker-rating">${escapeHtml(player.name)} skill
       <select data-dunker-skill="${escapeHtml(player.id)}" aria-label="Skill for ${escapeHtml(player.name)}">
         <option value="" ${player.skill === null ? "selected" : ""}>Unknown</option>
-        ${[1, 2, 3, 4, 5].map(skill => `<option value="${skill}" ${skill === player.skill ? "selected" : ""}>${skill}</option>`).join("")}
+        ${Array.from({ length: 10 }, (_, i) => i + 1).map(skill => `<option value="${skill}" ${skill === player.skill ? "selected" : ""}>${skill}</option>`).join("")}
       </select></label>`).join("");
 
   const playersHtml =
@@ -3798,6 +4172,15 @@ function handlePlayerSwapClick(
   const secondPlayer =
     target.player;
 
+  if (currentResult.plan.categoryMatchupActive && (
+      first.location === "team" && !playerCompatibleWithTeam(secondPlayer, first.team) ||
+      target.location === "team" && !playerCompatibleWithTeam(firstPlayer, target.team))) {
+    selectedSwapPlayer = null;
+    lastSwapMessage = "Keep players in their selected category teams. Players in the mixed group can only swap within the mixed group.";
+    renderResult(currentResult, false);
+    return;
+  }
+
   // Substitute status belongs to a roster slot when players are exchanged.
   const replaceSubstitute = (selection, outgoing, incoming) => {
     if (selection.location === "team") {
@@ -4204,6 +4587,7 @@ async function generateTeams(
     if (
       !alternative
     ) {
+      if (currentResult && currentRoundApproved && !window.confirm("Create new teams from everyone currently present? Record any completed game first. The current court layout will be replaced.")) return;
 
       currentRoundNumber =
         approvedFormations.length +
@@ -4487,6 +4871,7 @@ function approveCurrentFormation() {
     true;
 
   currentResult.courtGames.forEach((game, index) => { game.historyIndex = index; });
+  startScheduledGames();
   saveEveningSession();
 
 
@@ -4520,18 +4905,6 @@ async function remixForNextRound() {
     return;
 
   }
-
-
-  currentRoundNumber =
-    approvedFormations.length +
-    1;
-
-
-  currentRoundApproved =
-    false;
-
-
-  resetAlternativeHistory();
 
 
   await generateTeams(
@@ -4599,6 +4972,7 @@ remixButton
 
 function updateRoundControls() {
   updateCompletionControls();
+  document.getElementById("editNextAttendance").hidden = !currentRoundApproved;
 
   if (
     !currentResult
@@ -4634,7 +5008,7 @@ function updateRoundControls() {
 
 
     roundActionHelp.textContent =
-      `Formation ${currentRoundNumber} is approved. Record each game, then move teams manually. Reset & remix creates entirely new teams.`;
+      `Formation ${currentRoundNumber} is approved. Select each court's winner and confirm completion, then preview championship games or reset & remix.`;
 
 
     return;
@@ -4699,6 +5073,10 @@ function renderResult(
 
   currentResult =
     result;
+  document.getElementById("teamsEmpty").hidden = true;
+  document.getElementById("appendSchedule").disabled = false;
+  if (shouldScroll) showPanel("teams");
+  renderAutomaticSchedule();
 
   // Retain the old field for saved-session/report compatibility. Moving teams
   // is now standard, including when an older session saved this as false.
@@ -4752,7 +5130,9 @@ function renderResult(
   let historyNote =
     "";
 
-  const adultOnlyNote = plan.adultOnlyActive
+  const adultOnlyNote = plan.categoryMatchupActive
+    ? `<div class="recommendation-note">${(plan.categoryMatchups?.length?plan.categoryMatchups:[{...plan.categoryMatchup,courtsUsed:plan.categoryCourtsUsed}]).map(rule=>`${escapeHtml(rule.category1)} vs ${escapeHtml(rule.category2)} · ${rule.courtsUsed} ${rule.courtsUsed===1?"basket":"baskets"}`).join("<br>")}<br>Everyone else is mixed.</div>`
+    : plan.adultOnlyActive
     ? `<div class="recommendation-note">18+ only vs 18+ · ${plan.adultCourtsUsed} adult ${plan.adultCourtsUsed === 1 ? "basket" : "baskets"} used.</div>`
     : "";
 
@@ -4877,6 +5257,8 @@ function renderResult(
       ${autoRotationNote}
 
       ${adultOnlyNote}
+      ${plan.categoryNotice ? `<div class="history-warning">${escapeHtml(plan.categoryNotice)}</div>` : ""}
+      <div class="recommendation-note">Players with fewer completed games are prioritized for court places within each compatible group. Capacity and selected category rules can still require some players to wait.</div>
 
       ${historyNote}
 
@@ -4920,6 +5302,7 @@ function renderResult(
       const kidsLabel =
         game.specialKidsCourt
           ? " · Kids"
+          : game.categoryMatchup ? ` · ${escapeHtml(game.category1)} vs ${escapeHtml(game.category2)}`
           : game.adultOnly
             ? " · 18+"
             : "";
@@ -4931,6 +5314,15 @@ function renderResult(
           Court ${game.court}
           · ${format}${kidsLabel}
         </h2>
+
+        ${currentRoundApproved ? `<div class="court-winner">
+          <label for="winnerCourt${game.court}">Winner — Court ${game.court}</label>
+          <select id="winnerCourt${game.court}" data-court-winner="${game.court}" ${pendingGameCompletion() ? "disabled" : ""}>
+            <option value="">Select winner when the game ends</option>
+            ${[game.team1, game.team2].map(team => `<option value="${escapeHtml(team.id)}" ${game.winnerTeamId === team.id ? "selected" : ""}>${escapeHtml(team.name)}</option>`).join("")}
+          </select>
+          ${pendingGameCompletion() ? '<span class="setting-help">Winner recorded in Schedule. Undo last completion to correct it.</span>' : ""}
+        </div>` : '<p class="setting-help">Approve this formation to select the winner.</p>'}
 
         <div class="matchup">
 
@@ -5091,5 +5483,6 @@ function renderResult(
 // ==================================================
 
 loadEveningSession();
+renderAutomaticSchedule();
 
 loadPlayers();
