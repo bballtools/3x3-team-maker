@@ -85,6 +85,32 @@ async function boot(storage = new Map(), clipboardMode = 'modern', rosterOverrid
   return { run, click, elements, storage, copied };
 }
 
+test('official rating revisions replace old overrides and update saved team ratings without changing rosters or game counts', async () => {
+  const roster=Array.from({length:6},(_,i)=>({id:`p${i}`,name:`Player ${i}`,category:'U16',skill:6}));
+  const storage=new Map([
+    ['bballtools_3x3_local_players_v2',JSON.stringify([{id:'local',name:'Local Guest',category:'U16',skill:3}])],
+    ['bballtools_3x3_skill_overrides_v2',JSON.stringify({p0:9,local:7})]
+  ]);
+  const app=await boot(storage,'modern',roster);
+  app.run(`presentPlayerIds=new Set(players.map(player=>player.id));
+    renderResult(TeamOptimizer.generate(getPresentPlayers(),1,'3'),false);approveCurrentFormation();`);
+  app.click(0,0,1);
+  const layout=app.run('JSON.stringify(currentResult.teams.map(team=>team.players.map(player=>player.id)))');
+  const revised=roster.map(player=>({...player,skill:4,skillRevision:'official-1'}));
+  const updated=await boot(storage,'modern',revised);
+  assert.equal(updated.run('players.find(player=>player.id==="p0").skill'),4);
+  assert.equal(updated.run('players.find(player=>player.id==="local").skill'),7);
+  assert.equal(updated.run('JSON.stringify(currentResult.teams.map(team=>team.players.map(player=>player.id)))'),layout);
+  assert.equal(updated.run('Math.max(...GameCounter.totals(approvedFormations).players.values())'),1);
+  assert.equal(updated.run('currentResult.teams.flatMap(team=>team.players).concat(currentResult.rotationPlayers).filter(player=>player.id!=="local").every(player=>player.skill===4)'),true);
+  const edit={value:'8',dataset:{playerSkill:'p0'}};
+  updated.elements.get('playerList').events.change({target:{closest:selector=>selector==='select[data-player-skill]'?edit:null}});
+  const reloaded=await boot(storage,'modern',revised);
+  assert.equal(reloaded.run('players.find(player=>player.id==="p0").skill'),8);
+  const next=await boot(storage,'modern',revised.map(player=>({...player,skill:5,skillRevision:'official-2'})));
+  assert.equal(next.run('players.find(player=>player.id==="p0").skill'),5);
+});
+
 test('leaders can add and remove multiple category rows and restore them with approved six-basket sessions', async () => {
   const roster=Array.from({length:62},(_,i)=>({id:`m${i}`,name:`Player ${i}`,skill:i%10+1,category:i<6?'Kids':i<18?'U16':i<30?'18+':i%2?'U14':'U18'}));
   const app=await boot(new Map(),'modern',roster);

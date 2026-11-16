@@ -1415,7 +1415,12 @@ function mergePlayerSources() {
 
   ];
   players.forEach(player => {
-    const rating = skillOverrides[player.id];
+    const saved = skillOverrides[player.id];
+    // Official roster revisions supersede earlier device edits. New edits
+    // remain valid until that player's next official rating revision.
+    const rating = player.skillRevision
+      ? saved?.revision === player.skillRevision ? saved.value : null
+      : Number.isInteger(saved) ? saved : saved?.value;
     if (!player.isPlaceholder && Number.isInteger(rating) && rating >= 1 && rating <= 10) player.skill = rating;
   });
 
@@ -1474,6 +1479,22 @@ async function loadPlayers() {
 
     mergePlayerSources();
 
+    if (currentResult && currentRoundApproved) {
+      const official = new Map(players.filter(player => player.source === "master" && player.skillRevision).map(player => [player.id, player]));
+      let ratingsChanged = false;
+      [...currentResult.teams.flatMap(team => team.players), ...currentResult.rotationPlayers].forEach(player => {
+        const updated = official.get(player.id);
+        if (updated && (player.skill !== updated.skill || player.skillRevision !== updated.skillRevision)) {
+          player.skill = updated.skill;
+          player.skillRevision = updated.skillRevision;
+          ratingsChanged = true;
+        }
+      });
+      if (ratingsChanged) {
+        currentResult.teams.forEach(recalculateTeam);
+        saveEveningSession();
+      }
+    }
 
     renderPlayerInterface();
 
@@ -3107,7 +3128,8 @@ playerList.addEventListener("change", event => {
   const rating = Number(select.value);
   if (!Number.isInteger(rating) || rating < 1 || rating > 10) return;
   const id = select.dataset.playerSkill;
-  skillOverrides[id] = rating;
+  const player = players.find(player => player.id === id);
+  skillOverrides[id] = player?.skillRevision ? { value: rating, revision: player.skillRevision } : rating;
   localStorage.setItem(SKILL_OVERRIDES_KEY, JSON.stringify(skillOverrides));
   const copies = [...players, ...masterPlayers, ...localPlayers,
     ...(currentResult ? [...currentResult.teams.flatMap(team => team.players), ...currentResult.rotationPlayers] : [])];

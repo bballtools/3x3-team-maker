@@ -3,426 +3,504 @@
     "id": "P001",
     "name": "Thymen",
     "category": "18+",
-    "skill": 10
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P002",
     "name": "Tyler",
     "category": "18+",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P003",
     "name": "Dani",
     "category": "18+",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P004",
     "name": "Eliseo",
     "category": "18+",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P005",
     "name": "Brandon",
     "category": "18+",
-    "skill": 6
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P006",
     "name": "Tygo",
     "category": "U16",
-    "skill": 4
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P007",
     "name": "Igor",
     "category": "18+",
-    "skill": 10
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P008",
     "name": "Jayden (20)",
     "category": "18+",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P009",
     "name": "Michael",
     "category": "18+",
-    "skill": 4
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P010",
     "name": "Levi",
     "category": "U18",
-    "skill": 6
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P011",
     "name": "Sebastiaan",
     "category": "U16",
-    "skill": 6
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P012",
     "name": "Xenn",
     "category": "18+",
-    "skill": 10
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P013",
     "name": "Riou",
     "category": "U16",
-    "skill": 8
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P014",
     "name": "Jeremiah",
     "category": "U16",
-    "skill": 6
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P015",
     "name": "Tristan",
     "category": "U16",
-    "skill": 6
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P016",
     "name": "Sam",
     "category": "U18",
-    "skill": 6
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P017",
     "name": "Jayden (17)",
     "category": "U18",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P018",
     "name": "Owen",
     "category": "U16",
-    "skill": 4
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P019",
     "name": "Elinn",
     "category": "U16",
-    "skill": 4
+    "skill": 3,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P020",
     "name": "Damian",
     "category": "U16",
-    "skill": 8
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P021",
     "name": "Damon",
     "category": "U14",
-    "skill": 4
+    "skill": 3,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P022",
     "name": "Thijmen",
     "category": "18+",
-    "skill": 8
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P023",
     "name": "Rutger",
     "category": "18+",
-    "skill": 8
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P024",
     "name": "Kevin",
     "category": "18+",
-    "skill": 6
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P025",
     "name": "Ty",
     "category": "Kids",
-    "skill": 2
+    "skill": 1,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P026",
     "name": "Percy",
     "category": "Kids",
-    "skill": 2
+    "skill": 1,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P027",
     "name": "Marc",
     "category": "18+",
-    "skill": 10
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P028",
     "name": "Keano",
     "category": "18+",
-    "skill": 8
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P029",
     "name": "AT",
     "category": "U16",
-    "skill": 6
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P030",
     "name": "Ryan",
     "category": "U18",
-    "skill": 6
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P031",
     "name": "Nayro",
     "category": "18+",
-    "skill": 6
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P032",
     "name": "Benji",
     "category": "U18",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P033",
     "name": "Frans",
     "category": "18+",
-    "skill": 6
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P034",
     "name": "Niels",
     "category": "U18",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P035",
     "name": "Yiannis",
     "category": "U16",
-    "skill": 6
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P036",
     "name": "Lotte",
     "category": "U18",
-    "skill": 6
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P037",
     "name": "Gregory",
     "category": "18+",
-    "skill": 10
+    "skill": 9,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P038",
     "name": "Wiebe",
     "category": "18+",
-    "skill": 10
+    "skill": 9,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P039",
     "name": "Lois",
     "category": "Kids",
-    "skill": 2
+    "skill": 1,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P040",
     "name": "Finn",
     "category": "U14",
-    "skill": 4
+    "skill": 3,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P041",
     "name": "Levi U14",
     "category": "U14",
-    "skill": 4
+    "skill": 3,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P042",
     "name": "Jelte",
     "category": "U16",
-    "skill": 4
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P043",
     "name": "Boaz",
     "category": "18+",
-    "skill": 8
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P044",
     "name": "Do-Minh",
     "category": "U16",
-    "skill": 6
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P045",
     "name": "Lisanne",
     "category": "18+",
-    "skill": 4
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P046",
     "name": "Matthijs",
     "category": "18+",
-    "skill": 10
+    "skill": 9,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P047",
     "name": "Yannick",
     "category": "18+",
-    "skill": 10
+    "skill": 9,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P048",
     "name": "Yari",
     "category": "18+",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P049",
     "name": "Aidan",
     "category": "U16",
-    "skill": 6
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P050",
     "name": "Mikhail",
     "category": "U16",
-    "skill": 6
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P051",
     "name": "Sem",
     "category": "18+",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P052",
     "name": "Elvis",
     "category": "U16",
-    "skill": 6
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P053",
     "name": "Nino",
     "category": "U16",
-    "skill": 6
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P054",
     "name": "Jop",
     "category": "18+",
-    "skill": 8
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P055",
     "name": "Birk",
     "category": "18+",
-    "skill": 10
+    "skill": 9,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P056",
     "name": "Bas",
     "category": "18+",
-    "skill": 10
+    "skill": 9,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P057",
     "name": "Aiden Keizer",
     "category": "U16",
-    "skill": 6
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P058",
     "name": "Imran",
     "category": "18+",
-    "skill": 4
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P059",
     "name": "Noël",
     "category": "U18",
-    "skill": 4
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P060",
     "name": "Gijs",
     "category": "U18",
-    "skill": 6
+    "skill": 6,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P061",
     "name": "Bing",
     "category": "Kids",
-    "skill": 6
+    "skill": 2,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P062",
     "name": "Randolph",
     "category": "18+",
-    "skill": 10
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P063",
     "name": "Ties",
     "category": "Kids",
-    "skill": 2
+    "skill": 1,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P064",
     "name": "Adam",
     "category": "Kids",
-    "skill": 4
+    "skill": 2,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P065",
     "name": "Danny Vink",
     "category": "18+",
-    "skill": 10
+    "skill": 8,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P066",
     "name": "Emmanuel",
     "category": "U16",
-    "skill": 4
+    "skill": 4,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P067",
     "name": "Gino",
     "category": "U14",
-    "skill": 2
+    "skill": 2,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P068",
     "name": "Oltian",
     "category": "U16",
-    "skill": 8
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P069",
     "name": "Thom",
     "category": "18+",
-    "skill": 6
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P070",
     "name": "Roy Marcelino",
     "category": "18+",
-    "skill": 8
+    "skill": 7,
+    "skillRevision": "marc-2026-11-16-1"
   },
   {
     "id": "P071",
     "name": "Lee (Lesley)",
     "category": "18+",
-    "skill": 4
+    "skill": 5,
+    "skillRevision": "marc-2026-11-16-1"
+  },
+  {
+    "id": "P072",
+    "name": "Tygo",
+    "category": "U14",
+    "skill": 2,
+    "skillRevision": "marc-2026-11-16-1"
   }
 ]

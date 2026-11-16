@@ -17,11 +17,15 @@ selection, including players outside the current search or age filter. Rating
 edits, check-ins, removals and session resets update it immediately.
 
 Skills use whole numbers from **1 to 10**, shared across all ages, displayed in
-one numbered basketball. Existing 1–5 roster and saved player ratings are doubled
-once as a starting point; leaders can adjust any permanent player's rating in
-Players. These edits persist on this device. They do not move approved teams;
-the next generation uses the updated ratings. Marc's individual reassessments
-are still needed; the conversion does not infer new ratings for particular players.
+one numbered basketball. The HHW central roster uses Marc's supplied ratings.
+Legacy 1–5 saved ratings are migrated once; leaders can adjust any permanent
+player's rating in Players. These edits persist on this device. They do not move
+approved teams; the next generation uses the updated ratings.
+
+Official roster rating revisions replace older device overrides for those
+players, including ratings displayed on saved teams, without moving anyone or
+changing completed-game counts. Later leader edits remain editable and persist
+until the next official revision. Local newcomers' rating edits are unaffected.
 
 **Schedule** automatically lists approved matchups and completed games with their
 winners. Championship games appear after the leader reviews the preview and
