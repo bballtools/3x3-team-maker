@@ -102,6 +102,7 @@ const adultOnlyMode =
   document.getElementById("adultOnlyMode");
 const matchupCategory1 = document.getElementById("matchupCategory1");
 const matchupCategory2 = document.getElementById("matchupCategory2");
+const matchupRuleMode = document.getElementById("matchupRuleMode");
 
 const adultCourtMaximum =
   document.getElementById("adultCourtMaximum");
@@ -748,6 +749,7 @@ function loadEveningSession() {
       adultOnlyMode.value = rule || active.settings.adultOnly ? "category" : "mixed";
       matchupCategory1.value = rule?.category1 || "18+";
       matchupCategory2.value = rule?.category2 || "18+";
+      matchupRuleMode.value = rule?.mode || "versus";
       restoredCategoryCourtMaximum = rule?.maxCourts || active.settings.maxAdultCourts || 1;
       adultCourtMaximum.value = String(restoredCategoryCourtMaximum);
     }
@@ -879,7 +881,7 @@ function completeAllGames(confirmed = false) {
     results, scheduleBatchNumber: currentResult.scheduleBatchNumber });
   currentResult.pendingCompletionIndex = formation.completions.length - 1;
   championshipPreview = null;
-  document.getElementById("championshipPairing").value = currentResult.waitingTeams.length ? "waiting-winners" : "results";
+  document.getElementById("championshipPairing").value = currentResult.waitingTeams.length ? "waiting-first-winners" : "results";
   clearChampionshipPreview();
   saveEveningSession();
   renderResult(currentResult, false);
@@ -1004,7 +1006,9 @@ document.getElementById("previewChampionship").addEventListener("click", preview
 document.getElementById("startChampionship").addEventListener("click", startChampionshipGames);
 function updateChampionshipPairingHelp() {
   const mode = document.getElementById("championshipPairing").value;
-  document.getElementById("championshipPairingHelp").textContent = mode === "waiting-winners"
+  document.getElementById("championshipPairingHelp").textContent = mode === "waiting-first-winners"
+    ? "All compatible waiting teams enter first, in queue order. Fill remaining places with previous winners, then losers. If waiting teams fill the courts, winners also rest. Category rules and court capacity still apply."
+    : mode === "waiting-winners"
     ? "Winners keep their court places. Waiting teams enter in queue order to face them; remaining games pair winners with winners and losers with losers where possible. Category rules still apply."
     : mode === "waiting" ? "Waiting teams enter first to face losers. Winners rest as far as capacity allows. Category rules still apply."
     : "Pair winners with winners and losers with losers. Waiting teams remain on the bench. Category rules still apply.";
@@ -1122,9 +1126,10 @@ function startNewSession() {
 
   const confirmed =
     window.confirm(
-      "Start a new session?\n\n" +
-      "This will forget all approved rounds from the current session, clear attendance and return to Round 1.\n\n" +
-      "The central player roster and locally saved newcomers will stay."
+      "Clear today's session on this device?\n\n" +
+      "This clears today's checked-in players, games played, winners, approved formations and schedule notes. It cannot be undone.\n\n" +
+      "To change teams and keep today's history, cancel and use Create balanced teams or Reset & remix instead.\n\n" +
+      "The permanent player roster and saved skill ratings will stay."
     );
 
 
@@ -2869,19 +2874,21 @@ function updateAdultOnlySettings() {
   const available = getPresentPlayers().filter(player => !kidsIds.has(player.id));
   const count1 = available.filter(player => player.category === category1).length;
   const count2 = available.filter(player => player.category === category2).length;
-  const eligible = category1 === category2 ? count1 >= 6 : count1 >= 3 && count2 >= 3;
+  const mode = matchupRuleMode.value || "versus";
+  const poolSize = category1 === category2 ? count1 : count1 + count2;
+  const eligible = mode === "mix" ? poolSize >= 6 : category1 === category2 ? count1 >= 6 : count1 >= 3 && count2 >= 3;
 
   const formatPreference =
     document.getElementById("gameFormat").value;
 
   const adultPreference =
-    formatPreference === "4" && count1 < 8
+    formatPreference === "4" && (mode === "mix" ? poolSize : count1) < 8
       ? "3"
       : formatPreference;
 
   const usableAdultCourts = eligible
-    ? category1 === category2 ? TeamOptimizer.choosePlan(
-        count1,
+    ? mode === "mix" || category1 === category2 ? TeamOptimizer.choosePlan(
+        mode === "mix" ? poolSize : count1,
         Math.max(0, courts - (kidsBasketReserved ? 1 : 0)),
         adultPreference
       ).playableCourts : Math.min(Math.floor(count1 / 3), Math.floor(count2 / 3), Math.max(0, courts - (kidsBasketReserved ? 1 : 0)))
@@ -2909,10 +2916,13 @@ function updateAdultOnlySettings() {
   document.getElementById("categoryMatchupSetting").hidden = !enabled;
   adultCourtSetting.hidden = !enabled;
   adultOnlyStatus.hidden = !enabled;
+  document.getElementById("categoryMatchupHelp").textContent = mode === "mix"
+    ? "Build balanced teams from the combined selected categories, spreading the categories across teams where possible. At least 6 players in total are needed. Everyone else is mixed on remaining baskets."
+    : "Build separate teams for each selected category and play them against each other. At least 3 players per category are needed; selecting the same category needs 6. Choose 18+ and 18+ for adult-only games.";
   adultOnlyStatus.textContent = !eligible
-    ? `${category1}: ${count1}${category1 !== category2 ? ` · ${category2}: ${count2}` : ""} checked in. ${category1 === category2 ? `At least 6 ${category1} players are needed` : "At least 3 in each category are needed"}; the remaining players are mixed until then.`
+    ? `${category1}: ${count1}${category1 !== category2 ? ` · ${category2}: ${count2}` : ""} checked in. ${mode === "mix" ? "At least 6 players in total are needed" : category1 === category2 ? `At least 6 ${category1} players are needed` : "At least 3 in each category are needed"}; the remaining players are mixed until then.`
     : usableAdultCourts === 0 ? "No basket remains after reserving the Kids basket. Other players must wait."
-    : `${category1} vs ${category2} is available. ${category1}: ${count1}${category1 !== category2 ? ` · ${category2}: ${count2}` : ""} checked in. Everyone else is mixed; fewer-game priority applies within each group.`;
+    : `${category1} ${mode === "mix" ? "+" : "vs"} ${category2}${mode === "mix" ? " mixed" : ""} is available. ${category1}: ${count1}${category1 !== category2 ? ` · ${category2}: ${count2}` : ""} checked in. Everyone else is mixed; fewer-game priority applies within each group.`;
   renderAdditionalCategoryRules();
 }
 
@@ -2924,11 +2934,12 @@ function adultOnlyOptions() {
   const enabled = categoryMatchupEnabled();
   const category1 = matchupCategory1.value || "18+";
   const category2 = matchupCategory2.value || "18+";
+  const mode = matchupRuleMode.value || "versus";
   return {
     kidsOnly: kidsOnlyMode.checked,
     kidsGroupPlayerIds: kidsOnlyMode.checked ? selectedKidsGroupPlayers().map(player => player.id) : [],
-    categoryMatchup: enabled ? { category1, category2, maxCourts: Number(adultCourtMaximum.value) || 1 } : null,
-    categoryMatchups: enabled ? [{category1,category2,maxCourts:Number(adultCourtMaximum.value)||1},...additionalCategoryRules.map(rule=>({...rule}))] : [],
+    categoryMatchup: enabled ? { category1, category2, mode, maxCourts: Number(adultCourtMaximum.value) || 1 } : null,
+    categoryMatchups: enabled ? [{category1,category2,mode,maxCourts:Number(adultCourtMaximum.value)||1},...additionalCategoryRules.map(rule=>({...rule}))] : [],
     adultOnly: enabled && category1 === "18+" && category2 === "18+",
     maxAdultCourts: Number(adultCourtMaximum.value) || 1
   };
@@ -2942,22 +2953,24 @@ function renderAdditionalCategoryRules() {
   const available=getPresentPlayers().filter(player=>!kidsOnlyMode.checked || !selectedKidsGroupPlayers().some(member=>member.id===player.id));
   document.getElementById("additionalCategoryRules").innerHTML=additionalCategoryRules.map((rule,index)=>{
     const first=available.filter(player=>player.category===rule.category1).length,second=available.filter(player=>player.category===rule.category2).length;
-    const eligible=rule.category1===rule.category2?first>=6:first>=3&&second>=3;
-    return `<section class="category-matchup-setting extra-category-rule"><h3>Matchup ${index+2}</h3>
+    const mode=rule.mode||"versus";
+    const eligible=mode==="mix"?(rule.category1===rule.category2?first:first+second)>=6:rule.category1===rule.category2?first>=6:first>=3&&second>=3;
+    return `<section class="category-matchup-setting extra-category-rule"><h3>Category group ${index+2}</h3>
+      <div class="setting-row"><label for="ruleMode${index}">Build teams</label><select id="ruleMode${index}" data-rule-index="${index}" data-rule-field="mode"><option value="mix" ${mode==="mix"?"selected":""}>Mix selected categories into teams</option><option value="versus" ${mode==="versus"?"selected":""}>Separate category teams — play each other</option></select></div>
       <div class="setting-row"><label for="ruleFirst${index}">First category</label><select id="ruleFirst${index}" data-rule-index="${index}" data-rule-field="category1">${options(rule.category1)}</select></div>
-      <div class="setting-row"><label for="ruleSecond${index}">Plays against</label><select id="ruleSecond${index}" data-rule-index="${index}" data-rule-field="category2">${options(rule.category2)}</select></div>
+      <div class="setting-row"><label for="ruleSecond${index}">Second category</label><select id="ruleSecond${index}" data-rule-index="${index}" data-rule-field="category2">${options(rule.category2)}</select></div>
       <div class="setting-row"><label for="ruleBaskets${index}">Maximum baskets</label><select id="ruleBaskets${index}" data-rule-index="${index}" data-rule-field="maxCourts">${Array.from({length:Math.max(courts,rule.maxCourts)},(_,i)=>`<option value="${i+1}" ${rule.maxCourts===i+1?"selected":""}>${i+1}</option>`).join("")}</select></div>
-      <p class="setting-help">${escapeHtml(rule.category1)}: ${first}${rule.category1===rule.category2?"":` · ${escapeHtml(rule.category2)}: ${second}`} checked in. ${eligible?"Ready.":rule.category1===rule.category2?"Needs at least 6 players; mixed until then.":"Needs at least 3 per category; mixed until then."}</p>
-      <button type="button" class="secondary" data-remove-rule="${index}">Remove matchup ${index+2}</button></section>`;
+      <p class="setting-help">${escapeHtml(rule.category1)}: ${first}${rule.category1===rule.category2?"":` · ${escapeHtml(rule.category2)}: ${second}`} checked in. ${mode==="mix"?"Categories are mixed within teams. ":"Categories form separate teams. "}${eligible?"Ready.":mode==="mix"?"Needs at least 6 players in total; mixed with everyone else until then.":rule.category1===rule.category2?"Needs at least 6 players; mixed until then.":"Needs at least 3 per category; mixed until then."}</p>
+      <button type="button" class="secondary" data-remove-rule="${index}">Remove group ${index+2}</button></section>`;
   }).join("");
   const rules=adultOnlyOptions().categoryMatchups, used=new Set(),duplicates=new Set();
   rules.forEach(rule=>new Set([rule.category1,rule.category2]).forEach(category=>{if(used.has(category))duplicates.add(category);used.add(category);}));
   const reserved=kidsOnlyMode.checked?1:0;
   const requested=rules.reduce((sum,rule)=>sum+rule.maxCourts,0);
   document.getElementById("categoryBasketBudget").textContent=duplicates.size
-    ? `Each category can appear in one matchup. Already used: ${[...duplicates].join(", ")}.`
-    : requested+reserved>courts?`You allocated ${requested+reserved} baskets, including Kids, but only ${courts} are available. Reduce basket allocations or remove a matchup.`
-    : `${reserved} Kids basket · ${requested} category ${requested===1?"basket":"baskets"} · ${courts-reserved-requested} baskets left for mixed games. Each category can appear in one matchup.`;
+    ? `Each category can appear in one group. Already used: ${[...duplicates].join(", ")}.`
+    : requested+reserved>courts?`You allocated ${requested+reserved} baskets, including Kids, but only ${courts} are available. Reduce basket allocations or remove a group.`
+    : `${reserved} Kids basket · ${requested} category ${requested===1?"basket":"baskets"} · ${courts-reserved-requested} baskets left for mixed games. Each category can appear in one group.`;
   document.getElementById("addCategoryRule").disabled=used.size>=categories.length;
 }
 
@@ -2965,14 +2978,14 @@ document.getElementById("addCategoryRule").addEventListener("click",()=>{
   const used=new Set(adultOnlyOptions().categoryMatchups.flatMap(rule=>[rule.category1,rule.category2]));
   const category=CATEGORY_ORDER.find(category=>category!=="Kids"&&!used.has(category));
   if(!category)return;
-  additionalCategoryRules.push({category1:category,category2:category,maxCourts:1});
+  additionalCategoryRules.push({category1:category,category2:category,mode:"mix",maxCourts:1});
   updateAdultOnlySettings();invalidateResults();
 });
 document.getElementById("additionalCategoryRules").addEventListener("change",event=>{
   const select=event.target.closest("select[data-rule-index]");
   if(!select)return;
   const rule=additionalCategoryRules[Number(select.dataset.ruleIndex)],field=select.dataset.ruleField;
-  if(!rule||!["category1","category2","maxCourts"].includes(field))return;
+  if(!rule||!["category1","category2","maxCourts","mode"].includes(field))return;
   rule[field]=field==="maxCourts"?Number(select.value):select.value;
   updateAdultOnlySettings();invalidateResults();
 });
@@ -2988,8 +3001,11 @@ adultOnlyMode.addEventListener("change", () => {
   invalidateResults();
 });
 
-adultCourtMaximum.addEventListener("change", invalidateResults);
-[matchupCategory1, matchupCategory2].forEach(select => select.addEventListener("change", () => {
+adultCourtMaximum.addEventListener("change", () => {
+  renderAdditionalCategoryRules();
+  invalidateResults();
+});
+[matchupCategory1, matchupCategory2, matchupRuleMode].forEach(select => select.addEventListener("change", () => {
   updateAdultOnlySettings();
   invalidateResults();
 }));
@@ -3215,6 +3231,7 @@ function canAssignSubstitute(player, team) {
 function playerCompatibleWithTeam(player, team) {
   if (currentResult.plan.specialKidsCourt && isKidsGroupPlayer(player) !== (teamGroup(team) === "Kids")) return false;
   if (currentResult.plan.categoryMatchupActive && teamGroup(team) !== "Kids") {
+    if (team.allowedCategories) return team.allowedCategories.includes(player.category);
     if (team.requiredCategory) return player.category === team.requiredCategory;
     const rules = currentResult.plan.categoryMatchups?.length ? currentResult.plan.categoryMatchups : [currentResult.plan.categoryMatchup];
     return !rules.some(rule=>player.category===rule.category1||player.category===rule.category2);
@@ -3302,7 +3319,7 @@ function handleTeamMove(teamId) {
     return;
   }
   const replace = team => team.id === first.id ? second : team.id === second.id ? first : team;
-  if (currentResult.courtGames.some(game => game.categoryMatchup && game.category1 !== game.category2 &&
+  if (currentResult.courtGames.some(game => game.categoryMatchup && game.categoryMode !== "mix" && game.category1 !== game.category2 &&
       replace(game.team1).requiredCategory === replace(game.team2).requiredCategory)) {
     teamMoveStatus.textContent = "This move would break the selected category matchup. Exchange teams from the same category, or swap the two teams on one court.";
     return;
@@ -5153,7 +5170,7 @@ function renderResult(
     "";
 
   const adultOnlyNote = plan.categoryMatchupActive
-    ? `<div class="recommendation-note">${(plan.categoryMatchups?.length?plan.categoryMatchups:[{...plan.categoryMatchup,courtsUsed:plan.categoryCourtsUsed}]).map(rule=>`${escapeHtml(rule.category1)} vs ${escapeHtml(rule.category2)} · ${rule.courtsUsed} ${rule.courtsUsed===1?"basket":"baskets"}`).join("<br>")}<br>Everyone else is mixed.</div>`
+    ? `<div class="recommendation-note">${(plan.categoryMatchups?.length?plan.categoryMatchups:[{...plan.categoryMatchup,courtsUsed:plan.categoryCourtsUsed}]).map(rule=>`${escapeHtml(rule.category1)} ${rule.mode==="mix"?"+":"vs"} ${escapeHtml(rule.category2)}${rule.mode==="mix"?" mixed":""} · ${rule.courtsUsed} ${rule.courtsUsed===1?"basket":"baskets"}`).join("<br>")}<br>Everyone else is mixed.</div>`
     : plan.adultOnlyActive
     ? `<div class="recommendation-note">18+ only vs 18+ · ${plan.adultCourtsUsed} adult ${plan.adultCourtsUsed === 1 ? "basket" : "baskets"} used.</div>`
     : "";
@@ -5324,7 +5341,7 @@ function renderResult(
       const kidsLabel =
         game.specialKidsCourt
           ? " · Kids"
-          : game.categoryMatchup ? ` · ${escapeHtml(game.category1)} vs ${escapeHtml(game.category2)}`
+          : game.categoryMatchup ? ` · ${escapeHtml(game.category1)} ${game.categoryMode==="mix"?"+":"vs"} ${escapeHtml(game.category2)}${game.categoryMode==="mix"?" mixed":""}`
           : game.adultOnly
             ? " · 18+"
             : "";

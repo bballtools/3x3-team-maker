@@ -2503,7 +2503,9 @@
       if (options.categoryMatchups?.length) {
         otherResult = generateCategorySessions(others, courts - 1, formatPreference, historyStats, options.categoryMatchups);
       } else if (options.categoryMatchup) {
-        otherResult = generateCategorySession(others, courts - 1, formatPreference, historyStats, options.categoryMatchup);
+        otherResult = options.categoryMatchup.mode
+          ? generateCategorySessions(others, courts - 1, formatPreference, historyStats, [options.categoryMatchup])
+          : generateCategorySession(others, courts - 1, formatPreference, historyStats, options.categoryMatchup);
       } else if (options.adultOnly === true && adultCount >= 6) {
         otherResult = generateAdultOnlySession(others, courts - 1, formatPreference,
           historyStats, Number.isInteger(options.maxAdultCourts) ? options.maxAdultCourts : 1);
@@ -2555,6 +2557,7 @@
     const used = new Set();
     let requested = 0;
     for (const rule of rules) {
+      if (rule?.mode !== undefined && !["mix","versus"].includes(rule.mode)) throw new Error("Choose how to build teams for each category group.");
       if (!rule || ![rule.category1,rule.category2].every(category => CATEGORY_ORDER.includes(category) && category !== "Kids")) throw new Error("Choose valid categories for every matchup.");
       for (const category of new Set([rule.category1,rule.category2])) {
         if (used.has(category)) throw new Error(`${category} is already used in another matchup. Use each category in one rule.`);
@@ -2571,18 +2574,27 @@
       const pool = remaining.filter(player => [rule.category1,rule.category2].includes(player.category));
       const count1 = pool.filter(player => player.category === rule.category1).length;
       const count2 = pool.filter(player => player.category === rule.category2).length;
-      const eligible = rule.category1 === rule.category2 ? count1 >= 6 : count1 >= 3 && count2 >= 3;
+      const mode = rule.mode || "versus";
+      const eligible = mode === "mix" ? pool.length >= 6 : rule.category1 === rule.category2 ? count1 >= 6 : count1 >= 3 && count2 >= 3;
       if (!eligible) {
-        notices.push(`${rule.category1} vs ${rule.category2} needs ${rule.category1 === rule.category2 ? "6 players from that category" : "3 players per category"}; these players stay in the mixed group until then.`);
+        notices.push(`${rule.category1} ${mode === "mix" ? "+" : "vs"} ${rule.category2} needs ${mode === "mix" ? "6 players in total" : rule.category1 === rule.category2 ? "6 players from that category" : "3 players per category"}; these players stay in the mixed group until then.`);
         continue;
       }
-      const part = generateCategorySession(pool, courts-offset, preference, historyStats, rule);
-      const ruleId = [...new Set([rule.category1,rule.category2])].sort().join("-");
-      part.teams.forEach(team => { team.categoryRuleId = ruleId; });
-      part.courtGames.forEach(game => { game.court += offset; game.categoryRuleId = ruleId; });
+      const part = mode === "mix"
+        ? generateStandardSession(pool, Math.min(rule.maxCourts,courts-offset), preference === "4" && pool.length < 8 ? "3" : preference, historyStats)
+        : generateCategorySession(pool, courts-offset, preference, historyStats, rule);
+      const ruleId = `${mode}:${[...new Set([rule.category1,rule.category2])].sort().join("-")}`;
+      part.teams.forEach(team => {
+        team.categoryRuleId = ruleId;
+        if (mode === "mix") { team.allowedCategories = [...new Set([rule.category1,rule.category2])]; team.group = "category-matchup"; }
+      });
+      part.courtGames.forEach(game => {
+        game.court += offset;
+        Object.assign(game,{categoryRuleId:ruleId,categoryMode:mode,categoryMatchup:true,category1:rule.category1,category2:rule.category2});
+      });
       offset += part.courtGames.length;
       parts.push(part);
-      activeRules.push({...rule, ruleId, courtsUsed:part.courtGames.length});
+      activeRules.push({...rule, mode, ruleId, courtsUsed:part.courtGames.length});
       remaining = remaining.filter(player => !pool.includes(player));
     }
     const mixed = remaining.length >= 6
@@ -2975,6 +2987,7 @@
     }
 
     if (options.categoryMatchups?.length) return generateCategorySessions(selectedPlayers, courts, formatPreference, historyStats, options.categoryMatchups);
+    if (options.categoryMatchup?.mode) return generateCategorySessions(selectedPlayers, courts, formatPreference, historyStats, [options.categoryMatchup]);
     if (options.categoryMatchup) return generateCategorySession(selectedPlayers, courts, formatPreference, historyStats, options.categoryMatchup);
 
     if (options.adultOnly === true && adultCount >= 6) {

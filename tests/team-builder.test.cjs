@@ -91,6 +91,37 @@ test('category rules build pure opposing teams, mix everyone else and preserve K
   assert.ok(result.courtGames.find(game=>game.categoryMatchup).court>1);
 });
 
+test('mix mode balances a combined category pool while retaining separate Kids and adult-only groups', () => {
+  const {TeamOptimizer}=runtime();
+  const input=roster(36,['U14']);
+  input.slice(0,6).forEach(player=>player.category='Kids');
+  input.slice(6,12).forEach(player=>player.category='U16');
+  input.slice(12,18).forEach(player=>player.category='U18');
+  input.slice(18,30).forEach(player=>player.category='18+');
+  const result=TeamOptimizer.generate(input,5,'3',[],{kidsOnly:true,categoryMatchups:[
+    {category1:'U16',category2:'U18',mode:'mix',maxCourts:2},
+    {category1:'18+',category2:'18+',mode:'versus',maxCourts:1}
+  ]});
+  assertPartition(result,input);
+  const mixed=result.teams.filter(team=>team.allowedCategories);
+  assert.equal(mixed.length,4);
+  mixed.forEach(team=>{
+    assert.ok(team.players.every(player=>['U16','U18'].includes(player.category)));
+    assert.equal(new Set(team.players.map(player=>player.category)).size,2);
+  });
+  const adultTeams=result.teams.filter(team=>team.requiredCategory==='18+');
+  adultTeams.forEach(team=>assert.ok(team.players.every(player=>player.category==='18+')));
+  assert.ok(result.courtGames.some(game=>game.specialKidsCourt));
+  assert.ok(result.courtGames.some(game=>game.categoryMode==='mix'));
+  assert.ok(result.courtGames.some(game=>game.categoryMode==='versus'));
+  const sparse=roster(6,['U18']);
+  sparse[0].category='18+';
+  const combined=TeamOptimizer.generate(sparse,1,'4',[],{categoryMatchup:{category1:'U18',category2:'18+',mode:'mix',maxCourts:1}});
+  assertPartition(combined,sparse);
+  assert.equal(combined.courtGames[0].teamSize,3);
+  assert.equal(combined.plan.categoryMatchupActive,true);
+});
+
 test('62 players on six baskets support Kids, U16-only, adults-only and three mixed baskets together', () => {
   const { TeamOptimizer }=runtime();
   const input=roster(62,['U14','U18']);

@@ -15,6 +15,36 @@ function fixture(courts, waiting, group = 'regular', offset = 0, teamSize = 3) {
 }
 const group = team => team.group;
 
+test('the additional waiting-first mode admits the whole queue before winners, with older waiting teams kept first next time', () => {
+  for (let courts=1;courts<=4;courts++) for (let count=0;count<=10;count++) {
+    const input=fixture(courts,count);
+    const next=plan(input,input.outcomes,'waiting-first-winners',group);
+    const active=next.games.flatMap(game=>[game.team1.id,game.team2.id]);
+    input.waitingTeams.slice(0,courts*2).forEach(team=>assert.ok(active.includes(team.id)));
+    const winnerCount=input.outcomes.filter(game=>active.includes(game.winnerTeamId)).length;
+    assert.equal(winnerCount,Math.min(courts,Math.max(0,courts*2-count)));
+    assert.equal(new Set([...active,...next.waitingTeams.map(team=>team.id)]).size,input.teams.length);
+  }
+  const input=fixture(2,6);
+  const first=plan(input,input.outcomes,'waiting-first-winners',group);
+  const remaining=input.waitingTeams.slice(4).map(team=>team.id);
+  assert.deepEqual([...first.waitingTeams.slice(0,2).map(team=>team.id)],remaining);
+  const outcomes=first.games.map(game=>({court:game.court,team1Id:game.team1.id,team2Id:game.team2.id,winnerTeamId:game.team1.id}));
+  const second=plan({...input,courtGames:first.games,waitingTeams:first.waitingTeams},outcomes,'waiting-first-winners',group);
+  remaining.forEach(id=>assert.ok(second.games.some(game=>[game.team1.id,game.team2.id].includes(id))));
+});
+
+test('mixed-category teams can continue every championship mode without being treated as opposing pure categories', () => {
+  const input=fixture(2,4,'mixed-category-group');
+  input.teams.forEach(team=>team.allowedCategories=['U18','18+']);
+  input.courtGames.forEach(game=>Object.assign(game,{categoryMatchup:true,categoryMode:'mix',category1:'U18',category2:'18+'}));
+  for(const mode of ['waiting-first-winners','waiting-winners','waiting','results']) {
+    const next=plan(input,input.outcomes,mode,group);
+    assert.equal(next.games.length,2);
+    assert.equal(new Set(next.games.flatMap(game=>[game.team1.id,game.team2.id]).concat(next.waitingTeams.map(team=>team.id))).size,8);
+  }
+});
+
 test('winners meet winners and losers meet losers when the counts allow it', () => {
   const input = fixture(2,0);
   const next = plan(input, input.outcomes, 'results', group);
@@ -56,7 +86,7 @@ test('every championship mode preserves selected cross-category opponents', () =
   input.teams.forEach((team,index)=>team.requiredCategory=index%2?'U16':'U14');
   input.courtGames.forEach(game=>Object.assign(game,{categoryMatchup:true,category1:'U14',category2:'U16'}));
   input.outcomes[1].winnerTeamId=input.courtGames[1].team2.id;
-  for (const mode of ['waiting-winners','waiting','results']) {
+  for (const mode of ['waiting-first-winners','waiting-winners','waiting','results']) {
     const next=plan(input,input.outcomes,mode,group);
     next.games.forEach(game=>assert.notEqual(game.team1.requiredCategory,game.team2.requiredCategory));
     const ids=next.games.flatMap(game=>[game.team1.id,game.team2.id]).concat(next.waitingTeams.map(team=>team.id));

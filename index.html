@@ -14,7 +14,7 @@
 
   <link
     rel="stylesheet"
-    href="styles.css?v=20261116-hhw-ratings1"
+    href="styles.css?v=20261118-hhw-groups1"
   >
 
 </head>
@@ -144,29 +144,36 @@
 
     <div class="setting-row adult-only-setting">
 
-      <label for="adultOnlyMode">Category matchups</label>
+      <label for="adultOnlyMode">Category groups</label>
       <select id="adultOnlyMode">
         <option value="mixed">Mix all categories</option>
-        <option value="category">Choose categories to play each other</option>
+        <option value="category">Choose category groups</option>
       </select>
 
     </div>
 
     <div id="categoryMatchupSetting" class="category-matchup-setting" hidden>
       <div class="setting-row">
+        <label for="matchupRuleMode">Build teams</label>
+        <select id="matchupRuleMode">
+          <option value="mix">Mix selected categories into teams</option>
+          <option value="versus">Separate category teams — play each other</option>
+        </select>
+      </div>
+      <div class="setting-row">
         <label for="matchupCategory1">First category</label>
         <select id="matchupCategory1"><option>U14</option><option>U16</option><option>U18</option><option selected>18+</option></select>
       </div>
       <div class="setting-row">
-        <label for="matchupCategory2">Plays against</label>
+        <label for="matchupCategory2">Second category</label>
         <select id="matchupCategory2"><option>U14</option><option>U16</option><option>U18</option><option selected>18+</option></select>
       </div>
-      <p class="setting-help">Selected categories form their own teams. Everyone else is mixed on the remaining baskets. At least 3 players per side are needed; choosing the same category needs 6.</p>
+      <p id="categoryMatchupHelp" class="setting-help"></p>
     </div>
     <div id="adultCourtSetting" class="setting-row" hidden>
 
       <label for="adultCourtMaximum">
-        Maximum baskets for the category matchup
+        Maximum baskets for this group
       </label>
 
       <select id="adultCourtMaximum"></select>
@@ -176,7 +183,7 @@
     <div id="adultOnlyStatus" class="setting-help" aria-live="polite" hidden></div>
     <div id="extraMatchupSettings" hidden>
       <div id="additionalCategoryRules"></div>
-      <button id="addCategoryRule" type="button" class="secondary">+ Add another category matchup</button>
+      <button id="addCategoryRule" type="button" class="secondary">+ Add another category group</button>
       <p id="categoryBasketBudget" class="setting-help" role="status" aria-live="polite"></p>
     </div>
 
@@ -191,16 +198,21 @@
       </div>
 
 
+    </div>
+
+    <details class="session-reset-tools">
+      <summary>Session reset</summary>
+      <p class="setting-help">Only use this to start fresh. To change teams during today's activation, adjust Setup and create teams in Players, or use Reset &amp; remix. Those actions keep today's attendance and game history.</p>
       <button
         id="startNewSessionButton"
         type="button"
         class="new-session-button"
         disabled
       >
-        ↻ Start new session
+        Clear today's session
       </button>
 
-    </div>
+    </details>
 
   </section>
 
@@ -536,6 +548,7 @@
         <p>Keep the teams for championship play, or reset &amp; remix for a new formation.</p>
         <label for="championshipPairing">Championship pairing</label>
         <select id="championshipPairing">
+          <option value="waiting-first-winners">All waiting teams first — then winners, then losers</option>
           <option value="waiting-winners">Waiting teams first — play against winners</option>
           <option value="waiting">Waiting teams first — play against losers, rest winners</option>
           <option value="results">Winners vs winners · losers vs losers</option>
@@ -674,11 +687,11 @@
   <button id="cancelKidsCourt" type="button" class="secondary kids-dialog-cancel">Cancel</button>
 </dialog>
 
-<script src="optimizer.js?v=20261116-hhw-ratings1"></script>
+<script src="optimizer.js?v=20261118-hhw-groups1"></script>
 
-<script src="game-counter.js?v=20261116-hhw-ratings1"></script>
-<script src="championship.js?v=20261116-hhw-ratings1"></script>
-<script src="app.js?v=20261116-hhw-ratings1"></script>
+<script src="game-counter.js?v=20261118-hhw-groups1"></script>
+<script src="championship.js?v=20261118-hhw-groups1"></script>
+<script src="app.js?v=20261118-hhw-groups1"></script>
 
 
 </body>

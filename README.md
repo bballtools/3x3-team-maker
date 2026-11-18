@@ -38,12 +38,20 @@ winner records retain their counts; winners are not inferred retrospectively.
 After approval, choose a **Winner** on each court, then confirm **Game completed
 — all courts**. This records the results and counts once, then opens the next-game
 choice. **Reset & remix teams** builds a new draft for review and approval.
-**Keep championship** previews whole-team matchups in either of two modes:
+**Keep championship** previews whole-team matchups in four selectable modes:
+
+- **All waiting teams first — then winners, then losers** is the first option
+  and the default when teams are waiting. Fill available places from the waiting
+  queue first, then with winners, then losers. Winners may rest if waiting teams
+  fill all places. Teams still waiting retain priority over newly benched teams
+  in the next game. Court capacity and category restrictions can make further
+  waiting unavoidable. Waiting teams face winners when possible; remaining
+  games pair matching outcomes where possible.
 
 - **Winners vs winners · losers vs losers** pairs matching outcomes. Waiting
   teams stay on the bench in this mode.
-- **Waiting teams first — play against winners** is the first option and the
-  default when teams are waiting. Winners keep their court places; waiting
+- **Waiting teams first — play against winners** keeps the previous behavior.
+  Winners keep their court places; waiting
   teams enter in queue order to face them. Remaining places go to losers, with
   winners vs winners and losers vs losers wherever possible. If the waiting
   queue is larger than the available places, excess teams keep waiting.
@@ -85,8 +93,20 @@ teams. Otherwise, active and waiting pools are balanced separately. The builder
 minimizes the gap in team skill totals, then their variance, then spreads age
 categories and skill ratings, and finally reduces repeated teammates. It uses a
 bounded search, so the best possible balance is not guaranteed for every roster.
-In **Setup → Category matchups**, choose two categories and a maximum number of
-baskets for each rule. Use **Add another category matchup** for additional rules.
+In **Setup → Category groups**, choose **Build teams** for each group:
+
+- **Mix selected categories into teams** combines the two categories into one
+  balanced pool. For example, U18 + 18+ creates teams containing both ages where
+  possible, rather than pure U18 teams opposing pure adult teams. The pool needs
+  at least six players in total, with a 3v3 fallback if there are fewer than eight.
+- **Separate category teams — play each other** retains category-versus-category
+  games. Selecting 18+ and 18+ still creates adult-only games, and selecting
+  U14 and U16 creates pure U14 teams against pure U16 teams.
+
+Choose a maximum basket allocation per group. Use **Add another category group**
+for additional groups. Existing saved groups without a mode retain separate-team
+behavior. Mixed groups stay together during championship play, player swaps,
+team moves and substitute assignments; both selected categories are eligible.
 For example, six baskets can be allocated as one Kids basket, one U16 vs U16,
 one 18+ vs 18+, and three baskets for mixing the other categories (when enough
 players remain). Each category can appear in one rule. Duplicate categories or
@@ -164,10 +184,17 @@ assignments start a new matchup counter; previous games retain their original
 rosters and any historical participant exclusions. Team totals span changes within
 the formation; exact-lineup and player counters remain distinct.
 
-Counts are saved in the existing local evening session and reset with **Start a
-new session** or on a new date. Older approved rounds start at zero because
+Counts are saved in the existing local evening session and reset with
+**Clear today's session** or on a new date. Older approved rounds start at zero because
 completion was not previously recorded. Session data remains specific to this browser/device.
 
 Run the automated checks with `node --test tests/*.test.cjs`.
 
 The temporary developer report button has been removed from the leaders' testing version.
+
+**Setup → Session reset → Clear today's session** is the only manual action for
+starting fresh: it clears attendance, games, winners, formations and notes on
+this device after an explicit warning. Permanent players and saved ratings stay.
+For mid-activation setup changes, adjust Setup and use **Create balanced teams**
+in Players, or **Reset & remix**. Those actions keep today's attendance, recorded
+game counts and notes. Do not clear the session merely to change category groups.

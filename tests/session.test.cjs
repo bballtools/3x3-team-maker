@@ -85,6 +85,61 @@ async function boot(storage = new Map(), clipboardMode = 'modern', rosterOverrid
   return { run, click, elements, storage, copied };
 }
 
+test('switching to category mixing preserves today’s counts and notes, allows both selected categories and restores mixed mode', async () => {
+  const roster=Array.from({length:18},(_,i)=>({id:`mix${i}`,name:`Player ${i}`,category:i<6?'U18':i<12?'18+':'U14',skill:6}));
+  const app=await boot(new Map(),'modern',roster);
+  app.run(`courts=3;presentPlayerIds=new Set(players.map(player=>player.id));
+    renderResult(TeamOptimizer.generate(getPresentPlayers(),3,'3'),false);approveCurrentFormation();`);
+  app.click(0,0,1);
+  app.elements.get('scheduleNotes').value='Keep today’s notes';
+  app.elements.get('scheduleNotes').events.input({target:app.elements.get('scheduleNotes')});
+  const counts=app.run('JSON.stringify([...GameCounter.totals(approvedFormations).players])');
+  app.elements.get('adultOnlyMode').value='category';
+  app.elements.get('matchupRuleMode').value='mix';
+  app.elements.get('matchupCategory1').value='U18';
+  app.elements.get('matchupCategory2').value='18+';
+  app.elements.get('matchupRuleMode').events.change();
+  assert.equal(app.run('presentPlayerIds.size'),18);
+  assert.equal(app.run('JSON.stringify([...GameCounter.totals(approvedFormations).players])'),counts);
+  assert.match(app.elements.get('categoryMatchupHelp').textContent,/combined selected categories/);
+  app.elements.get('adultCourtMaximum').value='2';
+  app.elements.get('adultCourtMaximum').events.change();
+  assert.match(app.elements.get('categoryBasketBudget').textContent,/2 category baskets · 1 baskets left/);
+  await app.run('generateTeams(false)');
+  assert.equal(app.run('currentResult.teams.filter(team=>team.allowedCategories).every(team=>new Set(team.players.map(player=>player.category)).size===2)'),true);
+  app.run('const mixedTeam=currentResult.teams.find(team=>team.allowedCategories);');
+  assert.equal(app.run('canAssignSubstitute({category:"U18"},mixedTeam)'),true);
+  assert.equal(app.run('canAssignSubstitute({category:"18+"},mixedTeam)'),true);
+  assert.equal(app.run('canAssignSubstitute({category:"U14"},mixedTeam)'),false);
+  app.run('approveCurrentFormation()');
+  const reloaded=await boot(app.storage,'modern',roster);
+  assert.equal(reloaded.elements.get('matchupRuleMode').value,'mix');
+  assert.equal(reloaded.elements.get('adultCourtMaximum').value,'2');
+  assert.equal(reloaded.elements.get('scheduleNotes').value,'Keep today’s notes');
+  assert.equal(reloaded.run('JSON.stringify([...GameCounter.totals(approvedFormations).players])'),counts);
+  assert.equal(reloaded.run('presentPlayerIds.size'),18);
+  assert.equal(reloaded.run('currentResult.plan.categoryMatchups[0].mode'),'mix');
+});
+
+test('clearing today’s session requires confirmation and cancellation preserves attendance, games and notes', async () => {
+  const app=await boot();
+  app.run(`presentPlayerIds=new Set(players.map(player=>player.id));
+    renderResult(TeamOptimizer.generate(getPresentPlayers(),2,'3'),false);approveCurrentFormation();
+    scheduleText='Do not lose these notes';saveEveningSession();`);
+  app.click(0,0,1);
+  app.run('window.confirm=message=>{window.resetMessage=message;return false;};startNewSession();');
+  assert.match(app.run('window.resetMessage'),/cannot be undone/);
+  assert.match(app.run('window.resetMessage'),/Create balanced teams or Reset & remix/);
+  assert.equal(app.run('presentPlayerIds.size'),19);
+  assert.equal(app.run('scheduleText'),'Do not lose these notes');
+  assert.equal(app.run('Math.max(...GameCounter.totals(approvedFormations).players.values())'),1);
+  app.run('window.confirm=()=>true;startNewSession();');
+  assert.equal(app.run('presentPlayerIds.size'),0);
+  assert.equal(app.run('approvedFormations.length'),0);
+  assert.equal(app.run('scheduleText'),'');
+  assert.equal(app.run('players.length'),19);
+});
+
 test('official rating revisions replace old overrides and update saved team ratings without changing rosters or game counts', async () => {
   const roster=Array.from({length:6},(_,i)=>({id:`p${i}`,name:`Player ${i}`,category:'U16',skill:6}));
   const storage=new Map([
@@ -166,7 +221,7 @@ test('category settings drive pure matchups, protect manual changes and persist 
   assert.match(app.elements.get('teamMoveStatus').textContent,/break the selected category matchup/);
   app.run('approveCurrentFormation()');
   app.click(0,0,1);
-  assert.equal(app.elements.get('championshipPairing').value,'waiting-winners');
+  assert.equal(app.elements.get('championshipPairing').value,'waiting-first-winners');
   app.elements.get('previewChampionship').events.click();
   app.elements.get('startChampionship').events.click();
   assert.equal(app.run('currentResult.courtGames.filter(game=>game.categoryMatchup).every(game=>game.team1.requiredCategory!==game.team2.requiredCategory)'),true);

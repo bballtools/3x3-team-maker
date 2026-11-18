@@ -4,7 +4,7 @@
   // Select whole teams within the existing court capacity and group boundaries.
   // Waiting teams keep their queue order; no player roster is rebuilt here.
   function plan(result, outcomes, mode, groupForTeam) {
-    if (!["results", "waiting", "waiting-winners"].includes(mode)) throw new Error("Choose a championship format.");
+    if (!["results", "waiting", "waiting-winners", "waiting-first-winners"].includes(mode)) throw new Error("Choose a championship format.");
     const buckets = new Map();
     const key = team => `${team.teamSize}|${groupForTeam(team)}`;
     result.courtGames.forEach(game => {
@@ -27,10 +27,10 @@
     let mixedPairs = 0;
     buckets.forEach(bucket => {
       const slots = bucket.courts.length * 2;
-      const priority = mode === "waiting-winners" ? [...bucket.winners, ...bucket.waiting, ...bucket.losers] : mode === "waiting"
+      const priority = mode === "waiting-first-winners" ? [...bucket.waiting, ...bucket.winners, ...bucket.losers] : mode === "waiting-winners" ? [...bucket.winners, ...bucket.waiting, ...bucket.losers] : mode === "waiting"
         ? [...bucket.waiting, ...bucket.losers, ...bucket.winners]
         : [...bucket.winners, ...bucket.losers];
-      const crossCategory = bucket.courts[0].categoryMatchup && bucket.courts[0].category1 !== bucket.courts[0].category2;
+      const crossCategory = bucket.courts[0].categoryMatchup && bucket.courts[0].categoryMode !== "mix" && bucket.courts[0].category1 !== bucket.courts[0].category2;
       const selected = crossCategory
         ? [bucket.courts[0].category1, bucket.courts[0].category2].flatMap(category => priority.filter(team => team.requiredCategory === category).slice(0, bucket.courts.length))
         : priority.slice(0, slots);
@@ -45,7 +45,7 @@
         const role = team => bucket.waiting.includes(team) ? "waiting" : bucket.winners.includes(team) ? "winner" : "loser";
         const pairRank = (a, b) => {
           const roles = [role(a), role(b)];
-          const target = mode === "waiting-winners" ? "winner" : "loser";
+          const target = ["waiting-winners", "waiting-first-winners"].includes(mode) ? "winner" : "loser";
           if (mode !== "results" && roles.includes("waiting") && roles.includes(target)) return 0;
           if (role(a) === role(b)) return 1;
           return 2;
@@ -60,7 +60,7 @@
           pairs.push([left.splice(best.i, 1)[0], right.splice(best.j, 1)[0]]);
         }
       } else {
-        if (mode === "waiting-winners") {
+        if (["waiting-winners", "waiting-first-winners"].includes(mode)) {
           while (waiting.length && winners.length) pairs.push([waiting.shift(), winners.shift()]);
         } else if (mode === "waiting") {
           while (waiting.length && losers.length) pairs.push([waiting.shift(), losers.shift()]);
